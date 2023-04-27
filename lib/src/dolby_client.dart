@@ -2,17 +2,21 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_mediaapi_client/util/env.dart';
+import 'package:flutter_mediaapi_client/src/media_api_handle.dart';
+import 'package:flutter_mediaapi_client/src/util/env.dart';
 import 'package:http/http.dart';
 
-class DolbyMedaiApiClient extends StatefulWidget {
-  const DolbyMedaiApiClient({Key? key}) : super(key: key);
+class DolbyClient extends StatefulWidget {
+  const DolbyClient({Key? key}) : super(key: key);
 
   @override
-  State<DolbyMedaiApiClient> createState() => _DolbyMedaiApiClientState();
+  State<DolbyClient> createState() => _DolbyClientState();
 }
 
-class _DolbyMedaiApiClientState extends State<DolbyMedaiApiClient> {
+class _DolbyClientState extends State<DolbyClient> {
+
+  final _mediApi = MediaAPI();
+
   @override
   void initState() {
     super.initState();
@@ -21,15 +25,13 @@ class _DolbyMedaiApiClientState extends State<DolbyMedaiApiClient> {
   @override
   Widget build(BuildContext context) {
     return Column(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         OutlinedButton(
             child: const Text("Get Auth"),
             onPressed: () async {
               String appkey = ENV['DolbyMediaAPIAppKey']!;
               String appsecret = ENV['DolbyMediaAPIAppSecretKey']!;
-              String basicAuth =
-                  'Basic ${base64.encode(utf8.encode('$appkey:$appsecret'))}';
+              String basicAuth = 'Basic ${base64.encode(utf8.encode('$appkey:$appsecret'))}';
               print(basicAuth);
 
               // ref : https://docs.dolby.io/media-apis/reference/get-api-token
@@ -45,19 +47,32 @@ class _DolbyMedaiApiClientState extends State<DolbyMedaiApiClient> {
                   headers: header,
                 );
 
-                if (response.statusCode != 200)throw HttpException('${response.statusCode}/${response.body}');
+                //if (response.statusCode != 200)throw HttpException('${response.statusCode}/${response.body}');
+                if (response.statusCode != 200) throw '${response.statusCode}/${response.body}';
 
                 logger.i(response.statusCode);
                 logger.i(response.body);
 
                 var decodedResponse = jsonDecode(utf8.decode(response.bodyBytes)) as Map;
+
+                var expireDateTime = HttpDate.parse(response.headers['date']!).add(Duration(seconds: decodedResponse['expires_in']));
+                var expireTimeStamp = (expireDateTime.millisecondsSinceEpoch + DateTime.now().timeZoneOffset.inMilliseconds)~/1000; 
+                
                 //logger.d(decodedResponse['token_type']);
                 //logger.d(decodedResponse['access_token']);
+
+
+                _mediApi.write('access_token', decodedResponse['access_token']);
+                _mediApi.write('access_token_expire', expireTimeStamp);
+
 
               } on SocketException {
                 logger.e('No Internet connection 😑');
               } on HttpException catch (e) {
                 logger.e("Couldn't find the get 😱/n ${e.message}");
+              } catch (e) {
+                // executed for errors of all types other than Exception
+                logger.e("Couldn't find the get 😱/n ${e}");
               }
             }),
         OutlinedButton(
@@ -65,7 +80,8 @@ class _DolbyMedaiApiClientState extends State<DolbyMedaiApiClient> {
             onPressed: () async {
               String appkey = ENV['DolbyMediaAPIAppKey']!;
               String appsecret = ENV['DolbyMediaAPIAppSecretKey']!;
-              String basicAuth = 'Basic ${base64.encode(utf8.encode('$appkey:$appsecret'))}';
+              String basicAuth =
+                  'Basic ${base64.encode(utf8.encode('$appkey:$appsecret'))}';
               print(basicAuth);
 
               Uri uri = Uri.parse("https://api.dolby.com/media/input");
@@ -77,12 +93,14 @@ class _DolbyMedaiApiClientState extends State<DolbyMedaiApiClient> {
               try {
                 final response = await post(uri, headers: header, body: data);
 
-                if (response.statusCode != 200) throw HttpException('${response.statusCode}/${response.body}');
+                if (response.statusCode != 200)
+                  throw HttpException('${response.body}');
 
                 logger.i(response.statusCode);
                 logger.i(response.body);
 
-                var decodedResponse = jsonDecode(utf8.decode(response.bodyBytes)) as Map;
+                var decodedResponse =
+                    jsonDecode(utf8.decode(response.bodyBytes)) as Map;
                 logger.d(decodedResponse['token_type']);
                 logger.d(decodedResponse['access_token']);
               } on SocketException {

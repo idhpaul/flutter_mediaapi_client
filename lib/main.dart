@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_mediaapi_client/util/env.dart';
+import 'package:flutter_mediaapi_client/src/util/env.dart';
 
-
-import 'Dolby_Medai_api_client.dart';
+import 'src/dolby_client.dart';
 
 void main() {
-
   EnvDefinedCheck();
 
   runApp(const MyApp());
@@ -44,18 +42,15 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Center( 
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: const <Widget>[
-            DolbyMedaiApiClient(),
-          ],
-        ),
-      ), 
-    );
+      body: Center(
+      child:Column(
+              mainAxisAlignment: MainAxisAlignment.center, 
+              children: const [
+                DolbyClient(),
+      ]),
+    ));
   }
 }
