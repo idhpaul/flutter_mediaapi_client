@@ -4,15 +4,15 @@ import 'package:flutter_mediaapi_client/src/util/env.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class MediaAPI {
-  final _authManager = AuthManger();
+  final _authManager = AuthManger()..init();
   final _apiManager = ApiManger();
 
   void write(String key, dynamic value) async {
     _authManager.write(key, value);
   }
 
-  dynamic read<T>(dynamic key) async {
-    _authManager.read<T>(key);
+  dynamic read<T>(dynamic key) {
+    return _authManager.read<T>(key);
   }
 }
 
@@ -26,22 +26,25 @@ class AuthManger{
   //[Web]	          LocalStorage
   //[Windows]	      In the roaming AppData directory
 
+  late SharedPreferences _prefs;
+
+  Future init() async =>
+      _prefs = await SharedPreferences.getInstance();
+
   //write token
   void write(String key, dynamic value) async {
 
-    final SharedPreferences prefs = await SharedPreferences.getInstance();
-
     try {
       if (value is String) {
-        await prefs.setString(key, value);
+        await _prefs.setString(key, value);
       } else if(value is int){
-        await prefs.setInt(key, value);
+        await _prefs.setInt(key, value);
       } else if(value is double){
-        await prefs.setDouble(key, value);
+        await _prefs.setDouble(key, value);
       } else if(value is bool){
-        await prefs.setBool(key, value);
+        await _prefs.setBool(key, value);
       } else if(value is List<String>){
-        await prefs.setStringList(key, value);
+        await _prefs.setStringList(key, value);
       } else {
         throw "Not support type";
       }
@@ -51,23 +54,21 @@ class AuthManger{
   }
 
   //read token
-  dynamic read<T>(dynamic key) async {
-
-    final SharedPreferences prefs = await SharedPreferences.getInstance();
+  dynamic read<T>(dynamic key) {
 
     dynamic returnValue;
 
     try {
       if (T == String) {
-        returnValue = prefs.getString(key);
+        returnValue = _prefs.getString(key);
       } else if(T == int){
-        returnValue = prefs.getInt(key);
+        returnValue = _prefs.getInt(key);
       } else if(T == double){
-        returnValue = prefs.getDouble(key);
+        returnValue = _prefs.getDouble(key);
       } else if(T == bool){
-        returnValue = prefs.getBool(key);
+        returnValue = _prefs.getBool(key);
       } else if(T == List<String>){
-        returnValue = prefs.getStringList(key);
+        returnValue = _prefs.getStringList(key);
       } else {
         returnValue = null;
         throw "Not support type";

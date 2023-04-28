@@ -1,5 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.example.flutter_mediaapi_client">
+    package="com.flutter.flutter_mediaapi_client">
    <application
         android:label="flutter_mediaapi_client"
         android:name="${applicationName}"

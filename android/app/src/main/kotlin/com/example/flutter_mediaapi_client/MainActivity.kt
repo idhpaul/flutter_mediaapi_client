@@ -1,4 +1,4 @@
-package com.example.flutter_mediaapi_client
+package com.flutter.flutter_mediaapi_client
 
 import io.flutter.embedding.android.FlutterActivity
 
