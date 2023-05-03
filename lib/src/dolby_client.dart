@@ -7,9 +7,11 @@ import 'package:flutter_mediaapi_client/src/media_api_handle.dart';
 import 'package:flutter_mediaapi_client/src/util/env.dart';
 import 'package:http/http.dart';
 
-String assetFile = "assets/test/test.wav";
+//String assetFile = "assets/test/test_mix.wav";
+String assetFile = "assets/test/test_output_1st.wav";
 String inputFileUrl = "dlb://sample/test_input.wav";
 String outputFileUrl = "dlb://sample/test_output.wav";
+String outputFileJson = "dlb://sample/analyze_status.json";
 
 class DolbyClient extends StatefulWidget {
   const DolbyClient({Key? key}) : super(key: key);
@@ -266,6 +268,189 @@ class _DolbyClientState extends State<DolbyClient> {
               };
               Map<String, String> data = {
                 "url": outputFileUrl,
+              };
+
+              try {
+                final response = await post(uri, headers: header, body: json.encode(data));
+                
+
+                if (response.statusCode != 200)throw HttpException('${response.statusCode} / ${response.body}');
+
+                logger.i("${response.statusCode} / ${response.body}");
+
+              } on SocketException {
+                logger.e('No Internet connection 😑');
+              } on HttpException catch (e) {
+                logger.e("Couldn't find the post 😱 ${e}");
+              }
+            }),
+
+            const Divider(
+            thickness: 4,
+            color: Colors.grey,
+            ),
+
+            ElevatedButton(
+            child: const Text("Start Analyzing(Input)"),
+            onPressed: () async {
+
+              Uri uri = Uri.parse("https://api.dolby.com/media/analyze");
+              Map<String, String> header = {
+                'authorization': "Bearer ${_mediApi.read<String>('access_token')}",
+                'content-type': "application/json",
+              };
+              Map<String, dynamic> data = {
+                "content":{"silence":{"threshold":-60,"duration":2}},
+                "input": inputFileUrl,
+                "output": outputFileJson
+              };
+
+              try {
+
+                final response = await post(uri, headers: header ,body:jsonEncode(data));
+                
+
+                if (response.statusCode != 200)throw HttpException('${response.statusCode} / ${response.body}');
+
+                logger.i("${response.statusCode} / ${response.body}");
+
+                var decodedResponse = jsonDecode(utf8.decode(response.bodyBytes)) as Map;
+                _mediApi.write('analyzing_job_id', decodedResponse['job_id']);
+
+              } on SocketException {
+                logger.e('No Internet connection 😑');
+              } on HttpException catch (e) {
+                logger.e("Couldn't find the post 😱 ${e}");
+              }
+            }),
+        ElevatedButton(
+            child: const Text("Get Analyze Status(Input File)"),
+            onPressed: () async {
+
+              Uri uri = Uri.https("api.dolby.com", "/media/analyze", {"job_id":_mediApi.read<String>('analyzing_job_id')});
+              print(uri);
+ 
+              Map<String, String> header = {
+                'authorization': "Bearer ${_mediApi.read<String>('access_token')}",
+                'content-type': "application/json",
+              };
+
+              try {
+                final response = await get(uri, headers: header);
+                
+
+                if (response.statusCode != 200)throw HttpException('${response.statusCode} / ${response.body}');
+
+                logger.i("${response.statusCode} / ${response.body}");
+
+              } on SocketException {
+                logger.e('No Internet connection 😑');
+              } on HttpException catch (e) {
+                logger.e("Couldn't find the post 😱 ${e}");
+              }
+            }),
+          ElevatedButton(
+            child: const Text("Get Analyzing file to Dolby Temporary Cloud url"),
+            onPressed: () async {
+
+              Uri uri = Uri.parse("https://api.dolby.com/media/output");
+              Map<String, String> header = {
+                'authorization': "Bearer ${_mediApi.read<String>('access_token')}",
+                'content-type': "application/json",
+              };
+              Map<String, String> data = {
+                "url": outputFileJson,
+              };
+
+              try {
+                final response = await post(uri, headers: header, body: json.encode(data));
+                
+
+                if (response.statusCode != 200)throw HttpException('${response.statusCode} / ${response.body}');
+
+                logger.i("${response.statusCode} / ${response.body}");
+
+              } on SocketException {
+                logger.e('No Internet connection 😑');
+              } on HttpException catch (e) {
+                logger.e("Couldn't find the post 😱 ${e}");
+              }
+            }),
+            const Divider(
+            thickness: 4,
+            color: Colors.grey,
+            ),
+
+            ElevatedButton(
+            child: const Text("Start Analyzing(Output)"),
+            onPressed: () async {
+
+              Uri uri = Uri.parse("https://api.dolby.com/media/analyze");
+              Map<String, String> header = {
+                'authorization': "Bearer ${_mediApi.read<String>('access_token')}",
+                'content-type': "application/json",
+              };
+              Map<String, dynamic> data = {
+                "content":{"silence":{"threshold":-60,"duration":2}},
+                "input": outputFileUrl,
+                "output": outputFileJson
+              };
+
+              try {
+
+                final response = await post(uri, headers: header ,body:jsonEncode(data));
+                
+
+                if (response.statusCode != 200)throw HttpException('${response.statusCode} / ${response.body}');
+
+                logger.i("${response.statusCode} / ${response.body}");
+
+                var decodedResponse = jsonDecode(utf8.decode(response.bodyBytes)) as Map;
+                _mediApi.write('analyzing_job_id', decodedResponse['job_id']);
+
+              } on SocketException {
+                logger.e('No Internet connection 😑');
+              } on HttpException catch (e) {
+                logger.e("Couldn't find the post 😱 ${e}");
+              }
+            }),
+        ElevatedButton(
+            child: const Text("Get Analyze Status(Output File)"),
+            onPressed: () async {
+
+              Uri uri = Uri.https("api.dolby.com", "/media/analyze", {"job_id":_mediApi.read<String>('analyzing_job_id')});
+              print(uri);
+ 
+              Map<String, String> header = {
+                'authorization': "Bearer ${_mediApi.read<String>('access_token')}",
+                'content-type': "application/json",
+              };
+
+              try {
+                final response = await get(uri, headers: header);
+                
+
+                if (response.statusCode != 200)throw HttpException('${response.statusCode} / ${response.body}');
+
+                logger.i("${response.statusCode} / ${response.body}");
+
+              } on SocketException {
+                logger.e('No Internet connection 😑');
+              } on HttpException catch (e) {
+                logger.e("Couldn't find the post 😱 ${e}");
+              }
+            }),
+          ElevatedButton(
+            child: const Text("Get Analyzing file to Dolby Temporary Cloud url"),
+            onPressed: () async {
+
+              Uri uri = Uri.parse("https://api.dolby.com/media/output");
+              Map<String, String> header = {
+                'authorization': "Bearer ${_mediApi.read<String>('access_token')}",
+                'content-type': "application/json",
+              };
+              Map<String, String> data = {
+                "url": outputFileJson,
               };
 
               try {
