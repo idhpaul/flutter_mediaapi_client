@@ -22,7 +22,7 @@ class DolbyClient extends StatefulWidget {
 
 class _DolbyClientState extends State<DolbyClient> {
 
-  final _mediApi = MediaAPI();
+  final _mediApi = APIHandler();
 
   @override
   void initState() {
@@ -73,8 +73,8 @@ class _DolbyClientState extends State<DolbyClient> {
                 //logger.d(decodedResponse['access_token']);
 
 
-                _mediApi.write('access_token', decodedResponse['access_token']);
-                _mediApi.write('access_token_expire', expireDateTime.millisecondsSinceEpoch);
+                _mediApi.getPreferences().write('access_token', decodedResponse['access_token']);
+                _mediApi.getPreferences().write('access_token_expire', expireDateTime.millisecondsSinceEpoch);
 
 
               } on SocketException {
@@ -92,10 +92,10 @@ class _DolbyClientState extends State<DolbyClient> {
             var currentTimeStamp = DateTime.now().millisecondsSinceEpoch;
             print("현재시간(GST, KST) : $currentTimeStamp, ${(DateTime.fromMillisecondsSinceEpoch(currentTimeStamp).toLocal())}");
 
-            var storeTokenExpireTimeStamp = _mediApi.read<int>('access_token_expire');
+            var storeTokenExpireTimeStamp = _mediApi.getPreferences().read<int>('access_token_expire');
             print("토큰시간(GST, KST) : $storeTokenExpireTimeStamp, ${DateTime.fromMillisecondsSinceEpoch(storeTokenExpireTimeStamp).toLocal()}");
 
-            var storeToken = _mediApi.read<String>('access_token');
+            var storeToken = _mediApi.getPreferences().read<String>('access_token');
             print(storeToken);
 
             if(storeTokenExpireTimeStamp == null)
@@ -113,7 +113,7 @@ class _DolbyClientState extends State<DolbyClient> {
 
               Uri uri = Uri.parse("https://api.dolby.com/media/input");
               Map<String, String> header = {
-                'authorization': "Bearer ${_mediApi.read<String>('access_token')}",
+                'authorization': "Bearer ${_mediApi.getPreferences().read<String>('access_token')}",
                 'content-type': "application/json",
               };
               Map<String, String> data = {
@@ -129,7 +129,7 @@ class _DolbyClientState extends State<DolbyClient> {
                 logger.i(response.body);
 
                 var decodedResponse = jsonDecode(utf8.decode(response.bodyBytes)) as Map;
-                _mediApi.write('upload_url', decodedResponse['url']);
+                _mediApi.getPreferences().write('upload_url', decodedResponse['url']);
 
                 
 
@@ -144,7 +144,7 @@ class _DolbyClientState extends State<DolbyClient> {
             child: const Text("Put wav file to Dolby Temporary Cloud url"),
             onPressed: () async {
 
-              Uri uri = Uri.parse(_mediApi.read<String>('upload_url'));
+              Uri uri = Uri.parse(_mediApi.getPreferences().read<String>('upload_url'));
               ByteData wavData = await rootBundle.load(assetFile);
               Uint8List audioUint8List = wavData.buffer.asUint8List(wavData.offsetInBytes, wavData.lengthInBytes);
               List<int> audioListInt = audioUint8List.cast<int>();
@@ -170,7 +170,7 @@ class _DolbyClientState extends State<DolbyClient> {
 
               Uri uri = Uri.parse("https://api.dolby.com/media/output");
               Map<String, String> header = {
-                'authorization': "Bearer ${_mediApi.read<String>('access_token')}",
+                'authorization': "Bearer ${_mediApi.getPreferences().read<String>('access_token')}",
                 'content-type': "application/json",
               };
               Map<String, String> data = {
@@ -203,7 +203,7 @@ class _DolbyClientState extends State<DolbyClient> {
 
               Uri uri = Uri.parse("https://api.dolby.com/media/enhance");
               Map<String, String> header = {
-                'authorization': "Bearer ${_mediApi.read<String>('access_token')}",
+                'authorization': "Bearer ${_mediApi.getPreferences().read<String>('access_token')}",
                 'content-type': "application/json",
               };
               Map<String, dynamic> data = {
@@ -223,7 +223,7 @@ class _DolbyClientState extends State<DolbyClient> {
                 logger.i("${response.statusCode} / ${response.body}");
 
                 var decodedResponse = jsonDecode(utf8.decode(response.bodyBytes)) as Map;
-                _mediApi.write('job_id', decodedResponse['job_id']);
+                _mediApi.getPreferences().write('job_id', decodedResponse['job_id']);
 
               } on SocketException {
                 logger.e('No Internet connection 😑');
@@ -235,11 +235,11 @@ class _DolbyClientState extends State<DolbyClient> {
             child: const Text("Get Enhance Results"),
             onPressed: () async {
 
-              Uri uri = Uri.https("api.dolby.com", "/media/enhance", {"job_id":_mediApi.read<String>('job_id')});
+              Uri uri = Uri.https("api.dolby.com", "/media/enhance", {"job_id":_mediApi.getPreferences().read<String>('job_id')});
               print(uri);
  
               Map<String, String> header = {
-                'authorization': "Bearer ${_mediApi.read<String>('access_token')}",
+                'authorization': "Bearer ${_mediApi.getPreferences().read<String>('access_token')}",
                 'content-type': "application/json",
               };
 
@@ -263,7 +263,7 @@ class _DolbyClientState extends State<DolbyClient> {
 
               Uri uri = Uri.parse("https://api.dolby.com/media/output");
               Map<String, String> header = {
-                'authorization': "Bearer ${_mediApi.read<String>('access_token')}",
+                'authorization': "Bearer ${_mediApi.getPreferences().read<String>('access_token')}",
                 'content-type': "application/json",
               };
               Map<String, String> data = {
@@ -296,7 +296,7 @@ class _DolbyClientState extends State<DolbyClient> {
 
               Uri uri = Uri.parse("https://api.dolby.com/media/analyze");
               Map<String, String> header = {
-                'authorization': "Bearer ${_mediApi.read<String>('access_token')}",
+                'authorization': "Bearer ${_mediApi.getPreferences().read<String>('access_token')}",
                 'content-type': "application/json",
               };
               Map<String, dynamic> data = {
@@ -315,7 +315,7 @@ class _DolbyClientState extends State<DolbyClient> {
                 logger.i("${response.statusCode} / ${response.body}");
 
                 var decodedResponse = jsonDecode(utf8.decode(response.bodyBytes)) as Map;
-                _mediApi.write('analyzing_job_id', decodedResponse['job_id']);
+                _mediApi.getPreferences().write('analyzing_job_id', decodedResponse['job_id']);
 
               } on SocketException {
                 logger.e('No Internet connection 😑');
@@ -327,11 +327,11 @@ class _DolbyClientState extends State<DolbyClient> {
             child: const Text("Get Analyze Status(Input File)"),
             onPressed: () async {
 
-              Uri uri = Uri.https("api.dolby.com", "/media/analyze", {"job_id":_mediApi.read<String>('analyzing_job_id')});
+              Uri uri = Uri.https("api.dolby.com", "/media/analyze", {"job_id":_mediApi.getPreferences().read<String>('analyzing_job_id')});
               print(uri);
  
               Map<String, String> header = {
-                'authorization': "Bearer ${_mediApi.read<String>('access_token')}",
+                'authorization': "Bearer ${_mediApi.getPreferences().read<String>('access_token')}",
                 'content-type': "application/json",
               };
 
@@ -355,7 +355,7 @@ class _DolbyClientState extends State<DolbyClient> {
 
               Uri uri = Uri.parse("https://api.dolby.com/media/output");
               Map<String, String> header = {
-                'authorization': "Bearer ${_mediApi.read<String>('access_token')}",
+                'authorization': "Bearer ${_mediApi.getPreferences().read<String>('access_token')}",
                 'content-type': "application/json",
               };
               Map<String, String> data = {
@@ -387,7 +387,7 @@ class _DolbyClientState extends State<DolbyClient> {
 
               Uri uri = Uri.parse("https://api.dolby.com/media/analyze");
               Map<String, String> header = {
-                'authorization': "Bearer ${_mediApi.read<String>('access_token')}",
+                'authorization': "Bearer ${_mediApi.getPreferences().read<String>('access_token')}",
                 'content-type': "application/json",
               };
               Map<String, dynamic> data = {
@@ -406,7 +406,7 @@ class _DolbyClientState extends State<DolbyClient> {
                 logger.i("${response.statusCode} / ${response.body}");
 
                 var decodedResponse = jsonDecode(utf8.decode(response.bodyBytes)) as Map;
-                _mediApi.write('analyzing_job_id', decodedResponse['job_id']);
+                _mediApi.getPreferences().write('analyzing_job_id', decodedResponse['job_id']);
 
               } on SocketException {
                 logger.e('No Internet connection 😑');
@@ -418,11 +418,11 @@ class _DolbyClientState extends State<DolbyClient> {
             child: const Text("Get Analyze Status(Output File)"),
             onPressed: () async {
 
-              Uri uri = Uri.https("api.dolby.com", "/media/analyze", {"job_id":_mediApi.read<String>('analyzing_job_id')});
+              Uri uri = Uri.https("api.dolby.com", "/media/analyze", {"job_id":_mediApi.getPreferences().read<String>('analyzing_job_id')});
               print(uri);
  
               Map<String, String> header = {
-                'authorization': "Bearer ${_mediApi.read<String>('access_token')}",
+                'authorization': "Bearer ${_mediApi.getPreferences().read<String>('access_token')}",
                 'content-type': "application/json",
               };
 
@@ -446,7 +446,7 @@ class _DolbyClientState extends State<DolbyClient> {
 
               Uri uri = Uri.parse("https://api.dolby.com/media/output");
               Map<String, String> header = {
-                'authorization': "Bearer ${_mediApi.read<String>('access_token')}",
+                'authorization': "Bearer ${_mediApi.getPreferences().read<String>('access_token')}",
                 'content-type': "application/json",
               };
               Map<String, String> data = {

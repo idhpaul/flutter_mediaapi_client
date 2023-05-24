@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_mediaapi_client/src/media_api_handle.dart';
 import 'package:flutter_mediaapi_client/src/util/env.dart';
 
 import 'src/dolby_client.dart';
@@ -56,6 +57,9 @@ class _MyHomePageState extends State<MyHomePage> {
 
   @override
   Widget build(BuildContext context) {
+
+    APIHandler apiHandler = APIHandler();
+
     return Scaffold(
         backgroundColor: const Color(0xffffffff),
         appBar: AppBar(
@@ -289,7 +293,7 @@ class _MyHomePageState extends State<MyHomePage> {
                   ],
                 ),
               ),
-              const DolbyClient()
+              //const DolbyClient()
             ],
           ),
         ));
