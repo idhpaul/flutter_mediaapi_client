@@ -121,8 +121,10 @@ class APIHandler{
     });
 
 
+  
   APIReturnType _checkVerifyToken() {
-
+    // 외부에서 값을 수정했을 경우 캐쉬에 반영되지 않음(직접적으로 파일 내용 수정 및 삭제 등 포함)
+    // Shared_preference Method를 사용한 경우에만 캐쉬 작동
     _apiPreferences.reload();
 
     var currentTimeStamp = DateTime.now().millisecondsSinceEpoch;
@@ -136,13 +138,35 @@ class APIHandler{
     print("현재시간(GST, KST) : $currentTimeStamp, ${(DateTime.fromMillisecondsSinceEpoch(currentTimeStamp).toLocal())}");
     print("토큰시간(GST, KST) : $storeTokenExpireTimeStamp, ${DateTime.fromMillisecondsSinceEpoch(storeTokenExpireTimeStamp).toLocal()}");
 
-    print((currentTimeStamp > storeTokenExpireTimeStamp ) ? " 만료됨, expired token" : "유효함, valid token");
+    print((currentTimeStamp > storeTokenExpireTimeStamp ) ? " 토큰 만료" : "토큰 유효");
     return (currentTimeStamp > storeTokenExpireTimeStamp) ? APIReturnType.TOKEN_EXPIRE: APIReturnType.TOKEN_VERIFY;
    
   }
 
   void _publishToken() {
     _apiManager._getToken();
+  }
+
+  void getTokenState() {
+    var ret = _checkVerifyToken();
+
+    switch (ret) {
+      case APIReturnType.TOKEN_NONE:
+        _publishToken();
+        break;
+      case APIReturnType.TOKEN_EXPIRE:
+        _publishToken();
+        break;
+      case APIReturnType.TOKEN_VERIFY:
+        break;
+      case APIReturnType.ERROR:
+        // TODO: Handle this case.
+        break;
+      case APIReturnType.OK:
+        // TODO: Handle this case.
+        break;
+    }
+
   }
 
   String getAccessToken() {
@@ -167,6 +191,15 @@ class APIHandler{
 
     return _apiPreferences.read<String>('access_token');
   }
+
+  void startEnhancing() {
+    _apiManager._startEnhancing();
+  }
+  void getEnhancing() {
+    _apiManager._getEnhancing();
+  }
+
+
 }
 
 class DolbyAPIManager{
@@ -222,4 +255,67 @@ class DolbyAPIManager{
       logger.e("Couldn't find the get 😱/n ${e}");
     }
   }
+
+  void _startEnhancing() async {
+    String appkey = ENV['DolbyMediaAPIAppKey']!;
+    String appsecret = ENV['DolbyMediaAPIAppSecretKey']!;
+    String basicAuth = "Bearer ${_apiPreferences.read<String>('access_token')}";
+    print(basicAuth);
+
+    Uri uri = Uri.parse("https://api.dolby.com/media/enhance");
+    Map<String, String> header = {
+      'authorization': basicAuth,
+      'content-type': "application/json",
+    };
+    Map<String, dynamic> data = {
+      "audio": {"noise": {"reduction": {"enable": true}}},
+      "content":{"type": "voice_over"},
+      "input": "https://dolbyio",
+      "output": "https://dolbyio"
+    };
+
+    try {
+
+      final response = await post(uri, headers: header ,body:jsonEncode(data));
+      
+
+      if (response.statusCode != 200)throw HttpException('${response.statusCode} / ${response.body}');
+
+      logger.i("${response.statusCode} / ${response.body}");
+
+      var decodedResponse = jsonDecode(utf8.decode(response.bodyBytes)) as Map;
+      _apiPreferences.write('job_id', decodedResponse['job_id']);
+
+    } on SocketException {
+      logger.e('No Internet connection 😑');
+    } on HttpException catch (e) {
+      logger.e("Couldn't find the post 😱 ${e}");
+    }
+  }
+
+  void _getEnhancing() async {
+    Uri uri = Uri.https("api.dolby.com", "/media/enhance", {"job_id":_apiPreferences.read<String>('job_id')});
+    print(uri);
+
+    Map<String, String> header = {
+      'authorization': "Bearer ${_apiPreferences.read<String>('access_token')}",
+      'content-type': "application/json",
+    };
+
+    try {
+      final response = await get(uri, headers: header);
+      
+
+      if (response.statusCode != 200)throw HttpException('${response.statusCode} / ${response.body}');
+
+      logger.i("${response.statusCode} / ${response.body}");
+
+    } on SocketException {
+      logger.e('No Internet connection 😑');
+    } on HttpException catch (e) {
+      logger.e("Couldn't find the post 😱 ${e}");
+    }
+  }
+
+
 }

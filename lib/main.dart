@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_mediaapi_client/src/media_api_handle.dart';
 import 'package:flutter_mediaapi_client/src/util/env.dart';
+import 'package:flutter_mediaapi_client/src/widget/token_condition_widget.dart';
 
 import 'src/dolby_client.dart';
 
@@ -54,6 +55,7 @@ class _MyHomePageState extends State<MyHomePage> {
     BottomNavigationBarModel(icon: Icons.home, label: "Home"),
     BottomNavigationBarModel(icon: Icons.account_circle, label: "Account")
   ];
+
 
   @override
   Widget build(BuildContext context) {
@@ -114,8 +116,8 @@ class _MyHomePageState extends State<MyHomePage> {
                 mainAxisAlignment: MainAxisAlignment.end,
                 crossAxisAlignment: CrossAxisAlignment.center,
                 mainAxisSize: MainAxisSize.max,
-                children: [
-                  const Text(
+                children: const [
+                  Text(
                     "토큰 상태",
                     textAlign: TextAlign.start,
                     overflow: TextOverflow.clip,
@@ -126,12 +128,7 @@ class _MyHomePageState extends State<MyHomePage> {
                       color: Color(0xff000000),
                     ),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.add),
-                    onPressed: () {},
-                    color: const Color(0xff212435),
-                    iconSize: 24,
-                  ),
+                  TokenCondition(),
                 ],
               ),
               const Divider(
@@ -141,6 +138,22 @@ class _MyHomePageState extends State<MyHomePage> {
                 indent: 0,
                 endIndent: 0,
               ),
+
+              ElevatedButton(
+                child: const Text("1"),
+                onPressed: () async { apiHandler.startEnhancing(); }),
+              ElevatedButton(
+                child: const Text("2"),
+                onPressed: () async { apiHandler.getEnhancing(); }),
+
+              const Divider(
+                color: Color(0xff808080),
+                height: 16,
+                thickness: 0,
+                indent: 0,
+                endIndent: 0,
+              ),
+
               Container(
                 margin: const EdgeInsets.all(0),
                 padding: const EdgeInsets.all(10),
