@@ -169,32 +169,38 @@ class APIHandler{
 
   }
 
-  String getAccessToken() {
-    var ret = _checkVerifyToken();
+  Future<String?> createPreSignUrl(int inputNum) async {
 
-    switch (ret) {
-      case APIReturnType.TOKEN_NONE:
-        _publishToken();
-        break;
-      case APIReturnType.TOKEN_EXPIRE:
-        _publishToken();
-        break;
-      case APIReturnType.TOKEN_VERIFY:
-        break;
-      case APIReturnType.ERROR:
-        // TODO: Handle this case.
-        break;
-      case APIReturnType.OK:
-        // TODO: Handle this case.
-        break;
+    Uri uri = Uri.parse("http://localhost:8080/presignURL");
+    Map<String, String> header = {
+      'content-type': "application/json",
+    };
+    Map<String, dynamic> data = {
+      "need_url": inputNum,
+    };
+
+    try {
+
+      final response = await post(uri, headers: header ,body:jsonEncode(data));
+      
+
+      if (response.statusCode != 200)throw HttpException('${response.statusCode} / ${response.body}');
+
+      logger.i("${response.statusCode} / ${response.body}");
+
+      return response.body;
+
+    } on SocketException {
+      logger.e('No Internet connection 😑');
+      return null;
+    } on HttpException catch (e) {
+      logger.e("Couldn't find the post 😱 ${e}");
+      return null;
     }
 
-    return _apiPreferences.read<String>('access_token');
+    //_apiManager._startEnhancing();
   }
 
-  void startEnhancing() {
-    _apiManager._startEnhancing();
-  }
   void getEnhancing() {
     _apiManager._getEnhancing();
   }
