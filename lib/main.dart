@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_mediaapi_client/src/media_api_handle.dart';
@@ -56,12 +57,11 @@ class _MyHomePageState extends State<MyHomePage> {
   ];
 
   final apiHandler = APIHandler();
-  final textfieldController = TextEditingController();
+  final enhanceTextFieldController = TextEditingController();
+  final analyzeTextFieldController = TextEditingController();
 
   @override
   Widget build(BuildContext context) {
-
-    
 
     return Scaffold(
         backgroundColor: const Color(0xffffffff),
@@ -176,7 +176,7 @@ class _MyHomePageState extends State<MyHomePage> {
                               ),
                             ),
                             TextField(
-                              controller: textfieldController,
+                              controller: enhanceTextFieldController,
                               obscureText: false,
                               textAlign: TextAlign.left,
                               maxLines: 1,
@@ -229,7 +229,7 @@ class _MyHomePageState extends State<MyHomePage> {
                         padding: const EdgeInsets.fromLTRB(5, 0, 0, 0),
                         child: MaterialButton(
                           onPressed: () {
-                            if(textfieldController.text.isEmpty)
+                            if(enhanceTextFieldController.text.isEmpty)
                             {
                               showDialog(
                                 context: context,
@@ -256,17 +256,28 @@ class _MyHomePageState extends State<MyHomePage> {
                                 });
                             }
                             else {
-                              int inputNum = int.parse(textfieldController.text);
+                              int inputNum = int.parse(enhanceTextFieldController.text);
                               if(0 < inputNum && inputNum <=10){
                                 print('노이즈캔슬링 시작');
                                 // 1 링크 생성 요청 및 응답
                                 // param - 링크 수
                                 // return - 생성된 링크 배열
                                 var res = apiHandler.createPreSignUrl(inputNum);
+                                res.then((val) {
+                                  print('주소 생성 완료');
+                                  // 2 노이즈캔슬링 시작 (순차형, 분산형 방법 미정)
+                                  // param - 생성된 링크 배열
+                                  // return - 노이즈 캔슬링 jobid or void
+                                  for (var idx = 0; idx < inputNum; idx++) {
+                                    apiHandler.startEnhancing(idx,val);
+                                  }
+                                  
+                                }).catchError((error) {
+                                  // error가 해당 에러를 출력
+                                  print('error: $error');
+                                });
 
-                                // 2 노이즈캔슬링 시작 (순차형, 분산형 방법 미정)
-                                // param - 생성된 링크 배열
-                                // return - 노이즈 캔슬링 jobid or void
+                                
                                 
               
                               }
@@ -359,7 +370,7 @@ class _MyHomePageState extends State<MyHomePage> {
                               ),
                             ),
                             TextField(
-                              controller: textfieldController,
+                              controller: analyzeTextFieldController,
                               obscureText: false,
                               textAlign: TextAlign.left,
                               maxLines: 1,
@@ -412,7 +423,7 @@ class _MyHomePageState extends State<MyHomePage> {
                         padding: const EdgeInsets.fromLTRB(5, 0, 0, 0),
                         child: MaterialButton(
                           onPressed: () {
-                            if(textfieldController.text.isEmpty)
+                            if(analyzeTextFieldController.text.isEmpty)
                             {
                               showDialog(
                                 context: context,
@@ -439,7 +450,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                 });
                             }
                             else {
-                              int inputNum = int.parse(textfieldController.text);
+                              int inputNum = int.parse(analyzeTextFieldController.text);
                               if(0 < inputNum && inputNum <=10){
                                 print('이퀄라이징 시작');
                               }
@@ -495,6 +506,12 @@ class _MyHomePageState extends State<MyHomePage> {
                   ],
                 ),
               ),
+
+              OutlinedButton(
+                child: const Text("Save Excel"),
+                onPressed: () async {
+                  apiHandler.saveData();
+              }),
               
             ],
           ),

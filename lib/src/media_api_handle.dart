@@ -5,6 +5,8 @@ import 'dart:convert';
 import 'dart:core';
 import 'dart:io';
 
+import 'package:path/path.dart' as p;
+import 'package:excel/excel.dart';
 import 'package:flutter_mediaapi_client/src/util/env.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:schedulers/schedulers.dart';
@@ -23,9 +25,26 @@ enum APIReturnType {
 class APIPreferences {
   
   late SharedPreferences prefs;
+  late Excel excel;
+  late Sheet sheet;
 
   void init() async {
     prefs = await SharedPreferences.getInstance();
+    excel = Excel.createExcel();
+    sheet = excel['Enhance Result'];
+
+    var headCell1 = sheet.cell(CellIndex.indexByString("A3"));
+    headCell1.value = "index";
+
+    var headCell2 = sheet.cell(CellIndex.indexByString("B3"));
+    headCell2.value = "Start Enhance";
+
+    var headCell3 = sheet.cell(CellIndex.indexByString("C3"));
+    headCell3.value = "End Enhance";
+
+    var headCell4 = sheet.cell(CellIndex.indexByString("D3"));
+    headCell4.value = "Run Time";
+
   }
 
   void reload(){
@@ -79,6 +98,34 @@ class APIPreferences {
 
     return returnValue;
   }
+
+  void write_excel(String cellIdx, dynamic data){
+    var cell = sheet.cell(CellIndex.indexByString(cellIdx));
+    cell.value = data;
+  }
+
+  void save_excel(){
+    print('Current path style: ${p.style}');
+
+    print('Current process path: ${p.current}');
+
+    print('Separators');
+    for (var entry in [p.posix, p.windows, p.url]) {
+      print('  ${entry.style.toString().padRight(7)}: ${entry.separator}');
+    }
+
+    String outputFile = "/Users/idhpaul/Desktop/output.xlsx";
+
+    List<int>? fileBytes = excel.save();
+    if (fileBytes != null) {
+      File(p.join(outputFile))
+        ..createSync(recursive: true)
+        ..writeAsBytesSync(fileBytes);
+    }
+
+
+  }
+
 }
 
 class APIHandler{
@@ -169,40 +216,81 @@ class APIHandler{
 
   }
 
-  Future<String?> createPreSignUrl(int inputNum) async {
+  Future<String> createPreSignUrl(int inputNum) async {
 
     Uri uri = Uri.parse("http://localhost:8080/presignURL");
     Map<String, String> header = {
       'content-type': "application/json",
     };
     Map<String, dynamic> data = {
-      "need_url": inputNum,
+      "count": inputNum,
     };
+
+    late Response response;
 
     try {
 
-      final response = await post(uri, headers: header ,body:jsonEncode(data));
-      
+      response = await post(uri, headers: header ,body:jsonEncode(data));
 
       if (response.statusCode != 200)throw HttpException('${response.statusCode} / ${response.body}');
 
       logger.i("${response.statusCode} / ${response.body}");
 
-      return response.body;
-
     } on SocketException {
-      logger.e('No Internet connection 😑');
-      return null;
+      String errMsg = "No Internet connection 😑";
+      logger.e(errMsg);
+      throw SocketException(errMsg);
     } on HttpException catch (e) {
-      logger.e("Couldn't find the post 😱 ${e}");
-      return null;
+      String errMsg = "Couldn't find the post 😱 ${e}";
+      logger.e(errMsg);
+      throw HttpException(errMsg);
     }
 
-    //_apiManager._startEnhancing();
+    return response.body;
   }
 
-  void getEnhancing() {
-    _apiManager._getEnhancing();
+  void startEnhancing(int idx, String urlsJson){
+    _apiManager._startEnhancing(idx, urlsJson);
+  }
+
+  void checkEnhancingStatus(int idx) async {
+
+    Timer.periodic(
+      const Duration(milliseconds: 500), 
+      (timer) {
+
+        var res = _apiManager._checkEnhancingStatus(idx);
+        res.then((val) {
+          var decodedUrlJson = jsonDecode(val);
+          print(decodedUrlJson['status']);
+
+          if(decodedUrlJson['status'] == 'Success'){
+            logger.i("$idx - Enhancing End");
+
+            var selidx1 = "C${idx+4}";
+            _apiPreferences.write_excel(selidx1,DateTime.now().toLocal().toString());
+
+            timer.cancel();
+          }
+          else{
+            String wrongMsg = "Running : ${idx}";
+            logger.e(wrongMsg);
+          }
+
+        }).catchError((error) {
+          // error가 해당 에러를 출력
+          print('error: $error');
+        });
+
+    });
+
+    
+  }
+
+  void saveData(){
+    // 시간 계산 : =TEXT(C4-B4,"mm:ss.000")
+    _apiPreferences.save_excel();
+
   }
 
 
@@ -262,11 +350,15 @@ class DolbyAPIManager{
     }
   }
 
-  void _startEnhancing() async {
+  void _startEnhancing(int idx, String urlsJson) async {
     String appkey = ENV['DolbyMediaAPIAppKey']!;
     String appsecret = ENV['DolbyMediaAPIAppSecretKey']!;
     String basicAuth = "Bearer ${_apiPreferences.read<String>('access_token')}";
-    print(basicAuth);
+    //print(basicAuth);
+
+    var decodedUrlJson = jsonDecode(urlsJson);
+    //print(decodedUrlJson['urls'][idx]['input']);
+    //print(decodedUrlJson['urls'][idx]['output']);
 
     Uri uri = Uri.parse("https://api.dolby.com/media/enhance");
     Map<String, String> header = {
@@ -276,8 +368,8 @@ class DolbyAPIManager{
     Map<String, dynamic> data = {
       "audio": {"noise": {"reduction": {"enable": true}}},
       "content":{"type": "voice_over"},
-      "input": "https://dolbyio",
-      "output": "https://dolbyio"
+      "input": decodedUrlJson['urls'][idx]['input'],
+      "output": decodedUrlJson['urls'][idx]['output']
     };
 
     try {
@@ -288,39 +380,86 @@ class DolbyAPIManager{
       if (response.statusCode != 200)throw HttpException('${response.statusCode} / ${response.body}');
 
       logger.i("${response.statusCode} / ${response.body}");
+      logger.i("$idx - Enhancing Start");
+
+      var selidx1 = "A${idx+4}";
+      _apiPreferences.write_excel(selidx1,idx+1);
+      var selidx2 = "B${idx+4}";
+
+      _apiPreferences.write_excel(selidx2,DateTime.now().toLocal().toString());
 
       var decodedResponse = jsonDecode(utf8.decode(response.bodyBytes)) as Map;
-      _apiPreferences.write('job_id', decodedResponse['job_id']);
+      _apiPreferences.write('enhance_job_id_$idx', decodedResponse['job_id']);
+
+      Timer.periodic(
+      const Duration(milliseconds: 500), 
+      (timer) {
+
+        var res = _checkEnhancingStatus(idx);
+        res.then((val) {
+          var decodedUrlJson = jsonDecode(val);
+          print(decodedUrlJson['status']);
+
+          if(decodedUrlJson['status'] == 'Success'){
+            logger.i("$idx - Enhancing End");
+
+            var selidx1 = "C${idx+4}";
+            _apiPreferences.write_excel(selidx1,DateTime.now().toLocal().toString());
+
+            timer.cancel();
+          }
+          else{
+            String wrongMsg = "Running : ${idx}";
+            logger.e(wrongMsg);
+          }
+
+        }).catchError((error) {
+          // error가 해당 에러를 출력
+          print('error: $error');
+        });
+
+    });
 
     } on SocketException {
-      logger.e('No Internet connection 😑');
+      String errMsg = "No Internet connection 😑";
+      logger.e(errMsg);
+      throw SocketException(errMsg);
     } on HttpException catch (e) {
-      logger.e("Couldn't find the post 😱 ${e}");
+      String errMsg = "Couldn't find the post 😱 ${e}";
+      logger.e(errMsg);
+      throw HttpException(errMsg);
     }
   }
 
-  void _getEnhancing() async {
-    Uri uri = Uri.https("api.dolby.com", "/media/enhance", {"job_id":_apiPreferences.read<String>('job_id')});
-    print(uri);
+  Future<String> _checkEnhancingStatus(int idx) async {
+    Uri uri = Uri.https("api.dolby.com", "/media/enhance", {"job_id":_apiPreferences.read<String>('enhance_job_id_$idx')});
+    //print(uri);
 
     Map<String, String> header = {
       'authorization': "Bearer ${_apiPreferences.read<String>('access_token')}",
       'content-type': "application/json",
     };
 
+    late Response response;
+
     try {
-      final response = await get(uri, headers: header);
-      
+      response = await get(uri, headers: header);
 
       if (response.statusCode != 200)throw HttpException('${response.statusCode} / ${response.body}');
 
       logger.i("${response.statusCode} / ${response.body}");
 
     } on SocketException {
-      logger.e('No Internet connection 😑');
+      String errMsg = "No Internet connection 😑";
+      logger.e(errMsg);
+      throw SocketException(errMsg);
     } on HttpException catch (e) {
-      logger.e("Couldn't find the post 😱 ${e}");
+      String errMsg = "Couldn't find the post 😱 ${e}";
+      logger.e(errMsg);
+      throw HttpException(errMsg);
     }
+
+    return response.body;
   }
 
 
