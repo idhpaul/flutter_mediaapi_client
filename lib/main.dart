@@ -165,7 +165,7 @@ class _MyHomePageState extends State<MyHomePage> {
                           mainAxisSize: MainAxisSize.max,
                           children: [
                             const Text(
-                              "노이즈캔슬링 평가",
+                              "노이즈캔슬링 처리시간",
                               textAlign: TextAlign.start,
                               overflow: TextOverflow.clip,
                               style: TextStyle(
@@ -262,7 +262,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                 // 1 링크 생성 요청 및 응답
                                 // param - 링크 수
                                 // return - 생성된 링크 배열
-                                var res = apiHandler.createPreSignUrl(inputNum);
+                                var res = apiHandler.createPreSignEnhance(inputNum);
                                 res.then((val) {
                                   print('주소 생성 완료');
                                   // 2 노이즈캔슬링 시작 (순차형, 분산형 방법 미정)
@@ -359,7 +359,7 @@ class _MyHomePageState extends State<MyHomePage> {
                           mainAxisSize: MainAxisSize.max,
                           children: [
                             const Text(
-                              "이퀄라이징 평가",
+                              "노이즈캔슬링 평가",
                               textAlign: TextAlign.start,
                               overflow: TextOverflow.clip,
                               style: TextStyle(
@@ -370,7 +370,7 @@ class _MyHomePageState extends State<MyHomePage> {
                               ),
                             ),
                             TextField(
-                              controller: analyzeTextFieldController,
+                              controller: enhanceTextFieldController,
                               obscureText: false,
                               textAlign: TextAlign.left,
                               maxLines: 1,
@@ -423,7 +423,7 @@ class _MyHomePageState extends State<MyHomePage> {
                         padding: const EdgeInsets.fromLTRB(5, 0, 0, 0),
                         child: MaterialButton(
                           onPressed: () {
-                            if(analyzeTextFieldController.text.isEmpty)
+                            if(enhanceTextFieldController.text.isEmpty)
                             {
                               showDialog(
                                 context: context,
@@ -450,9 +450,243 @@ class _MyHomePageState extends State<MyHomePage> {
                                 });
                             }
                             else {
-                              int inputNum = int.parse(analyzeTextFieldController.text);
+                              int inputNum = int.parse(enhanceTextFieldController.text);
+                              if(0 < inputNum && inputNum <=10){
+                                print('노이즈캔슬링 평가 시작');
+                                // 1 링크 생성 요청 및 응답
+                                // param - 링크 수
+                                // return - 생성된 링크 배열
+                                var res = apiHandler.createPreSignAnalyze(inputNum);
+                                res.then((val) {
+                                  print('주소 생성 완료');
+                                  // 2 음성 분석 시작 (순차형, 분산형 방법 미정)
+                                  for (var idx = 0; idx < inputNum; idx++) {
+                                    apiHandler.startAnalyze(idx,val);
+                                  }
+                                  
+                                  // 2번 과정이 지나고 시작해야됨(옵저버 패턴 필요_ReactiveX 활용 예정)
+                                  Future.delayed(const Duration(milliseconds: 25000), () { 
+
+ 	                                  print('Wait 25 second'); 
+                                    // 3 음성 분석 시작 (순차형, 분산형 방법 미정)
+                                    for (var idx = 0; idx < inputNum; idx++) {
+                                      var res = apiHandler.getAnalyzeJson(idx);
+                                      res.then((val){
+                                        apiHandler.compareAnalyzeData(idx,val);
+                                      }).catchError((error) {
+                                        // error가 해당 에러를 출력
+                                        print('error: $error');
+                                      });
+                                    }
+ 	                                });
+
+                                  
+                                  
+                                }).catchError((error) {
+                                  // error가 해당 에러를 출력
+                                  print('error: $error');
+                                });
+
+                                
+                                
+              
+                              }
+                              else {
+                                showDialog(
+                                  context: context,
+                                  barrierDismissible: true, // 바깥 영역 터치시 닫을지 여부
+                                  builder: (BuildContext context) {
+                                    return  AlertDialog(
+                                      title: const Text('에러'),
+                                      content: SingleChildScrollView(
+                                        child: ListBody(
+                                          children: const <Widget>[
+                                            Text('범위내의 값을 입력하세요. (1~100)'),
+                                          ],
+                                        ),
+                                      ),
+                                      actions: <Widget>[
+                                        TextButton(
+                                          child: const Text('확인'),
+                                          onPressed: () {
+                                            Navigator.of(context).pop();
+                                          },
+                                        ),
+                                      ],
+                                    );
+                                });
+                              }
+                            }
+                          },
+                          color: const Color(0xffffffff),
+                          elevation: 0,
+                          shape: const RoundedRectangleBorder(
+                            borderRadius: BorderRadius.zero,
+                            side:
+                                BorderSide(color: Color(0xff808080), width: 1),
+                          ),
+                          padding: const EdgeInsets.all(16),
+                          textColor: const Color(0xff000000),
+                          height: 40,
+                          minWidth: 140,
+                          child: const Text(
+                            "실행",
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w400,
+                              fontStyle: FontStyle.normal,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const Divider(
+                color: Color(0xff808080),
+                height: 16,
+                thickness: 0,
+                indent: 0,
+                endIndent: 0,
+              ),
+
+              Container(
+                margin: const EdgeInsets.all(0),
+                padding: const EdgeInsets.all(10),
+                width: MediaQuery.of(context).size.width,
+                decoration: BoxDecoration(
+                  color: const Color(0x1f000000),
+                  shape: BoxShape.rectangle,
+                  borderRadius: BorderRadius.circular(10.0),
+                  border: Border.all(color: const Color(0x4d9e9e9e), width: 1),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.max,
+                  children: [
+                    Expanded(
+                      flex: 4,
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(0, 0, 5, 0),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.start,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.max,
+                          children: [
+                            const Text(
+                              "이퀄라이징 처리 시간",
+                              textAlign: TextAlign.start,
+                              overflow: TextOverflow.clip,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w400,
+                                fontStyle: FontStyle.normal,
+                                fontSize: 20,
+                                color: Color(0xff000000),
+                              ),
+                            ),
+                            TextField(
+                              controller: enhanceTextFieldController,
+                              obscureText: false,
+                              textAlign: TextAlign.left,
+                              maxLines: 1,
+                              keyboardType: TextInputType.number,
+                              inputFormatters: <TextInputFormatter>[
+                                FilteringTextInputFormatter.digitsOnly],
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w400,
+                                fontStyle: FontStyle.normal,
+                                fontSize: 14,
+                                color: Color(0xff000000),
+                              ),
+                              decoration: InputDecoration(
+                                disabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(4.0),
+                                  borderSide: const BorderSide(
+                                      color: Color(0xff000000), width: 1),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(4.0),
+                                  borderSide: const BorderSide(
+                                      color: Color(0xff000000), width: 1),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(4.0),
+                                  borderSide: const BorderSide(
+                                      color: Color(0xff000000), width: 1),
+                                ),
+                                hintText: "시료 수 입력(1~100)",
+                                hintStyle: const TextStyle(
+                                  fontWeight: FontWeight.w400,
+                                  fontStyle: FontStyle.normal,
+                                  fontSize: 14,
+                                  color: Color(0xff000000),
+                                ),
+                                filled: true,
+                                fillColor: const Color(0xfff2f2f3),
+                                isDense: true,
+                                contentPadding: const EdgeInsets.symmetric(
+                                    vertical: 8, horizontal: 12),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      flex: 1,
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(5, 0, 0, 0),
+                        child: MaterialButton(
+                          onPressed: () {
+                            if(enhanceTextFieldController.text.isEmpty)
+                            {
+                              showDialog(
+                                context: context,
+                                barrierDismissible: true, // 바깥 영역 터치시 닫을지 여부
+                                builder: (BuildContext context) {
+                                  return  AlertDialog(
+                                    title: const Text('에러'),
+                                    content: SingleChildScrollView(
+                                      child: ListBody(
+                                        children: const <Widget>[
+                                          Text('값을 입력하세요'),
+                                        ],
+                                      ),
+                                    ),
+                                    actions: <Widget>[
+                                      TextButton(
+                                        child: const Text('확인'),
+                                        onPressed: () {
+                                          Navigator.of(context).pop();
+                                        },
+                                      ),
+                                    ],
+                                  );
+                                });
+                            }
+                            else {
+                              int inputNum = int.parse(enhanceTextFieldController.text);
                               if(0 < inputNum && inputNum <=10){
                                 print('이퀄라이징 시작');
+                                // 1 링크 생성 요청 및 응답
+                                // param - 링크 수
+                                // return - 생성된 링크 배열
+                                var res = apiHandler.createPreSignEqualize(inputNum);
+                                res.then((val) {
+                                  print('주소 생성 완료');
+                                  // 2 음성 분석 시작 (순차형, 분산형 방법 미정)
+                                  for (var idx = 0; idx < inputNum; idx++) {
+                                    apiHandler.startEqualize(idx,val);
+                                  }
+
+                                }).catchError((error) {
+                                  // error가 해당 에러를 출력
+                                  print('error: $error');
+                                });
+
                               }
                               else {
                                 showDialog(

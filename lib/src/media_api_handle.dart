@@ -5,12 +5,16 @@ import 'dart:convert';
 import 'dart:core';
 import 'dart:io';
 
+import 'package:logger/logger.dart';
 import 'package:path/path.dart' as p;
 import 'package:excel/excel.dart';
 import 'package:flutter_mediaapi_client/src/util/env.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:schedulers/schedulers.dart';
 import 'package:http/http.dart';
+
+const int TIMER_PERIODIC_MS = 1000;
+
 
 enum APIReturnType {
   ERROR,
@@ -216,75 +220,37 @@ class APIHandler{
 
   }
 
-  Future<String> createPreSignUrl(int inputNum) async {
+  Future<String> createPreSignEnhance(int inputNum) async {
+    return _apiManager._createPreSignEnhance(inputNum);
+  }
 
-    Uri uri = Uri.parse("http://localhost:8080/presignURL");
-    Map<String, String> header = {
-      'content-type': "application/json",
-    };
-    Map<String, dynamic> data = {
-      "count": inputNum,
-    };
+  Future<String> createPreSignAnalyze(int inputNum) async {
+    return _apiManager._createPreSignAnalyze(inputNum);
+  }
 
-    late Response response;
+  Future<String> createPreSignEqualize(int inputNum) async {
+    return _apiManager._createPreSignEqualize(inputNum);
+  }
 
-    try {
-
-      response = await post(uri, headers: header ,body:jsonEncode(data));
-
-      if (response.statusCode != 200)throw HttpException('${response.statusCode} / ${response.body}');
-
-      logger.i("${response.statusCode} / ${response.body}");
-
-    } on SocketException {
-      String errMsg = "No Internet connection 😑";
-      logger.e(errMsg);
-      throw SocketException(errMsg);
-    } on HttpException catch (e) {
-      String errMsg = "Couldn't find the post 😱 ${e}";
-      logger.e(errMsg);
-      throw HttpException(errMsg);
-    }
-
-    return response.body;
+  Future<String> getAnalyzeJson(int idx, {int retryCount = 0}) async {
+    return _apiManager._getAnalyzeJson(idx);
   }
 
   void startEnhancing(int idx, String urlsJson){
     _apiManager._startEnhancing(idx, urlsJson);
   }
 
-  void checkEnhancingStatus(int idx) async {
+  void startAnalyze(int idx, String urlsJson){
+    _apiManager._startAnalyzing(idx, urlsJson, isOriginal:true);
+    _apiManager._startAnalyzing(idx, urlsJson);
+  }
 
-    Timer.periodic(
-      const Duration(milliseconds: 500), 
-      (timer) {
+  void compareAnalyzeData(int idx, String urlsJson){
+    _apiManager._compareAnalyzeData(idx, urlsJson);
+  }
 
-        var res = _apiManager._checkEnhancingStatus(idx);
-        res.then((val) {
-          var decodedUrlJson = jsonDecode(val);
-          print(decodedUrlJson['status']);
-
-          if(decodedUrlJson['status'] == 'Success'){
-            logger.i("$idx - Enhancing End");
-
-            var selidx1 = "C${idx+4}";
-            _apiPreferences.write_excel(selidx1,DateTime.now().toLocal().toString());
-
-            timer.cancel();
-          }
-          else{
-            String wrongMsg = "Running : ${idx}";
-            logger.e(wrongMsg);
-          }
-
-        }).catchError((error) {
-          // error가 해당 에러를 출력
-          print('error: $error');
-        });
-
-    });
-
-    
+  void startEqualize(int idx, String urlsJson){
+    _apiManager._startEqualizing(idx, urlsJson);
   }
 
   void saveData(){
@@ -350,9 +316,143 @@ class DolbyAPIManager{
     }
   }
 
+  Future<String> _createPreSignEnhance(int inputNum) async {
+
+    Uri uri = Uri.parse("http://localhost:8080/presignEnhance");
+    Map<String, String> header = {
+      'content-type': "application/json",
+    };
+    Map<String, dynamic> data = {
+      "count": inputNum,
+    };
+
+    late Response response;
+
+    try {
+
+      response = await post(uri, headers: header ,body:jsonEncode(data));
+
+      if (response.statusCode != 200)throw HttpException('${response.statusCode} / ${response.body}');
+
+      logger.i("${response.statusCode} / ${response.body}");
+
+    } on SocketException {
+      String errMsg = "No Internet connection 😑";
+      logger.e(errMsg);
+      throw SocketException(errMsg);
+    } on HttpException catch (e) {
+      String errMsg = "Couldn't find the post 😱 ${e}";
+      logger.e(errMsg);
+      throw HttpException(errMsg);
+    }
+
+    return response.body;
+  }
+
+  Future<String> _createPreSignAnalyze(int inputNum, {int retryCount = 0}) async {
+
+    Uri uri = Uri.parse("http://localhost:8080/presignAnalyze");
+    Map<String, String> header = {
+      'content-type': "application/json",
+    };
+    Map<String, dynamic> data = {
+      "count": inputNum,
+      "retry": retryCount
+    };
+
+    late Response response;
+
+    try {
+
+      response = await post(uri, headers: header ,body:jsonEncode(data));
+
+      if (response.statusCode != 200) throw HttpException('${response.statusCode} / ${response.body}');
+
+      logger.i("${response.statusCode} / ${response.body}");
+
+    } on SocketException {
+      String errMsg = "No Internet connection 😑";
+      logger.e(errMsg);
+      throw SocketException(errMsg);
+    } on HttpException catch (e) {
+      String errMsg = "Couldn't find the post 😱 ${e}";
+      logger.e(errMsg);
+      throw HttpException(errMsg);
+    }
+
+    return response.body;
+  }
+
+  Future<String> _createPreSignEqualize(int inputNum, {int retryCount = 0}) async {
+
+    Uri uri = Uri.parse("http://localhost:8080/presignEqualize");
+    Map<String, String> header = {
+      'content-type': "application/json",
+    };
+    Map<String, dynamic> data = {
+      "count": inputNum,
+      "retry": retryCount
+    };
+
+    late Response response;
+
+    try {
+
+      response = await post(uri, headers: header ,body:jsonEncode(data));
+
+      if (response.statusCode != 200) throw HttpException('${response.statusCode} / ${response.body}');
+
+      logger.i("${response.statusCode} / ${response.body}");
+
+    } on SocketException {
+      String errMsg = "No Internet connection 😑";
+      logger.e(errMsg);
+      throw SocketException(errMsg);
+    } on HttpException catch (e) {
+      String errMsg = "Couldn't find the post 😱 ${e}";
+      logger.e(errMsg);
+      throw HttpException(errMsg);
+    }
+
+    return response.body;
+  }
+
+  Future<String> _getAnalyzeJson(int idx, {int retryCount = 0}) async {
+
+    Uri uri = Uri.parse("http://localhost:8080/getAnalyzeJson");
+    Map<String, String> header = {
+      'content-type': "application/json",
+    };
+    Map<String, dynamic> data = {
+      "index": idx,
+      "retry": retryCount
+    };
+
+    late Response response;
+
+    try {
+
+      response = await post(uri, headers: header ,body:jsonEncode(data));
+
+      if (response.statusCode != 200) throw HttpException('${response.statusCode} / ${response.body}');
+
+      logger.i("${response.statusCode} / ${response.body}");
+
+    } on SocketException {
+      String errMsg = "No Internet connection 😑";
+      logger.e(errMsg);
+      throw SocketException(errMsg);
+    } on HttpException catch (e) {
+      String errMsg = "Couldn't find the post 😱 ${e}";
+      logger.e(errMsg);
+      throw HttpException(errMsg);
+    }
+
+    return response.body;
+  }
+
   void _startEnhancing(int idx, String urlsJson) async {
-    String appkey = ENV['DolbyMediaAPIAppKey']!;
-    String appsecret = ENV['DolbyMediaAPIAppSecretKey']!;
+
     String basicAuth = "Bearer ${_apiPreferences.read<String>('access_token')}";
     //print(basicAuth);
 
@@ -392,7 +492,7 @@ class DolbyAPIManager{
       _apiPreferences.write('enhance_job_id_$idx', decodedResponse['job_id']);
 
       Timer.periodic(
-      const Duration(milliseconds: 500), 
+      const Duration(milliseconds: TIMER_PERIODIC_MS), 
       (timer) {
 
         var res = _checkEnhancingStatus(idx);
@@ -409,8 +509,8 @@ class DolbyAPIManager{
             timer.cancel();
           }
           else{
-            String wrongMsg = "Running : ${idx}";
-            logger.e(wrongMsg);
+            String doingMsg = "Running ${idx} : ${decodedUrlJson['progress']}";
+            logger.e(doingMsg);
           }
 
         }).catchError((error) {
@@ -419,7 +519,7 @@ class DolbyAPIManager{
         });
 
     });
-
+      
     } on SocketException {
       String errMsg = "No Internet connection 😑";
       logger.e(errMsg);
@@ -462,5 +562,345 @@ class DolbyAPIManager{
     return response.body;
   }
 
+  void _startAnalyzing(int idx, String urlsJson, {bool isOriginal = false} ) async {
+
+    String basicAuth = "Bearer ${_apiPreferences.read<String>('access_token')}";
+    //print(basicAuth);
+
+    var decodedUrlJson = jsonDecode(urlsJson);
+    //print(decodedUrlJson['urls'][idx]['input']);
+    //print(decodedUrlJson['urls'][idx]['output']);
+
+    Uri uri = Uri.parse("https://api.dolby.com/media/analyze");
+    Map<String, String> header = {
+      'authorization': basicAuth,
+      'content-type': "application/json",
+    };
+    
+    Map<String, dynamic> data = 
+    (isOriginal) 
+    ? {
+        "content":{"silence":{"threshold":-60,"duration":2}},
+        "input": decodedUrlJson['urljsons'][idx]['originalurl'],
+        "output": decodedUrlJson['urljsons'][idx]['originalouputjson']
+      }
+    : {
+        "content":{"silence":{"threshold":-60,"duration":2}},
+        "input": decodedUrlJson['urljsons'][idx]['inputurl'],
+        "output": decodedUrlJson['urljsons'][idx]['outputjson']
+    };
+
+    try {
+
+      final response = await post(uri, headers: header ,body:jsonEncode(data));
+      
+
+      if (response.statusCode != 200)throw HttpException('${response.statusCode} / ${response.body}');
+
+      logger.i("${response.statusCode} / ${response.body}");
+      logger.i("$idx - Analyzing Start");
+
+      // var selidx1 = "A${idx+4}";
+      // _apiPreferences.write_excel(selidx1,idx+1);
+      // var selidx2 = "B${idx+4}";
+
+      // _apiPreferences.write_excel(selidx2,DateTime.now().toLocal().toString());
+
+      var decodedResponse = jsonDecode(utf8.decode(response.bodyBytes)) as Map;
+      (isOriginal) ? _apiPreferences.write('analyze_original_job_id_$idx', decodedResponse['job_id']) 
+                    : _apiPreferences.write('analyze_job_id_$idx', decodedResponse['job_id']);
+      
+      
+
+      Timer.periodic(
+      const Duration(milliseconds: TIMER_PERIODIC_MS), 
+      (timer) {
+
+        var res = (isOriginal) ? _checkAnalyzeStatus(idx,isOriginal: true) : _checkAnalyzeStatus(idx);
+        res.then((val) {
+          var decodedUrlJson = jsonDecode(val);
+          print(decodedUrlJson['status']);
+
+          if(decodedUrlJson['status'] == 'Success'){
+            logger.i("$idx - Analyzing End");
+
+            //var selidx1 = "C${idx+4}";
+           // _apiPreferences.write_excel(selidx1,DateTime.now().toLocal().toString());
+
+            timer.cancel();
+          }
+          else{
+            String doingMsg = "Running ${idx} : ${decodedUrlJson['progress']}";
+            logger.e(doingMsg);
+          }
+
+        }).catchError((error) {
+          // error가 해당 에러를 출력
+          print('error: $error');
+        });
+
+    });
+      
+    } on SocketException {
+      String errMsg = "No Internet connection 😑";
+      logger.e(errMsg);
+      throw SocketException(errMsg);
+    } on HttpException catch (e) {
+      String errMsg = "Couldn't find the post 😱 ${e}";
+      logger.e(errMsg);
+      throw HttpException(errMsg);
+    }
+  }
+
+  Future<String> _checkAnalyzeStatus(int idx,{bool isOriginal = false}) async {
+
+    Uri uri;
+    if(isOriginal){
+      uri = Uri.https("api.dolby.com", "/media/analyze", {"job_id":_apiPreferences.read<String>('analyze_original_job_id_$idx')});
+    }
+    else{
+      uri = Uri.https("api.dolby.com", "/media/analyze", {"job_id":_apiPreferences.read<String>('analyze_job_id_$idx')});
+    }
+    //print(uri);
+
+    Map<String, String> header = {
+      'authorization': "Bearer ${_apiPreferences.read<String>('access_token')}",
+      'content-type': "application/json",
+    };
+
+
+    late Response response;
+
+    try {
+      response = await get(uri, headers: header);
+
+      if (response.statusCode != 200)throw HttpException('${response.statusCode} / ${response.body}');
+
+      logger.i("${response.statusCode} / ${response.body}");
+
+    } on SocketException {
+      String errMsg = "No Internet connection 😑";
+      logger.e(errMsg);
+      throw SocketException(errMsg);
+    } on HttpException catch (e) {
+      String errMsg = "Couldn't find the post 😱 ${e}";
+      logger.e(errMsg);
+      throw HttpException(errMsg);
+    }
+
+    return response.body;
+  }
+
+  void _compareAnalyzeData(int idx, String urlsJson, {bool isOriginal = false} ) async {
+
+    var decodedUrlJson = jsonDecode(urlsJson);
+    //print(decodedUrlJson['originalAnalyzejson']);
+    //print(decodedUrlJson['analyzejson']);
+
+    Uri originalJsonUri = Uri.parse(decodedUrlJson['originalAnalyzejson']);
+    Uri outputJsonUri = Uri.parse(decodedUrlJson['analyzejson']);
+    Map<String, String> header = {
+      'content-type': "application/json",
+    };
+
+    double originalAnalyzeNoiseAverage;
+    double analyzeNoiseAverage;
+    
+    try {
+
+      final response = await get(originalJsonUri);
+      
+
+      if (response.statusCode != 200)throw HttpException('${response.statusCode} / ${response.body}');
+
+      logger.i("${response.statusCode} / Get Original Analyze Json Data");
+
+      var decodedResponse = jsonDecode(utf8.decode(response.bodyBytes)) as Map;
+      originalAnalyzeNoiseAverage = decodedResponse['processed_region']['audio']['noise']['level_average'];
+
+    } on SocketException {
+      String errMsg = "No Internet connection 😑";
+      logger.e(errMsg);
+      throw SocketException(errMsg);
+    } on HttpException catch (e) {
+      String errMsg = "Couldn't find the post 😱 ${e}";
+      logger.e(errMsg);
+      throw HttpException(errMsg);
+    }
+
+    try {
+
+      final response = await get(outputJsonUri, headers: header);
+      
+
+      if (response.statusCode != 200)throw HttpException('${response.statusCode} / ${response.body}');
+
+      logger.i("${response.statusCode} / Get Analyze Json Data");
+
+      var decodedResponse = jsonDecode(utf8.decode(response.bodyBytes)) as Map;
+      analyzeNoiseAverage = decodedResponse['processed_region']['audio']['noise']['level_average'];
+
+    } on SocketException {
+      String errMsg = "No Internet connection 😑";
+      logger.e(errMsg);
+      throw SocketException(errMsg);
+    } on HttpException catch (e) {
+      String errMsg = "Couldn't find the post 😱 ${e}";
+      logger.e(errMsg);
+      throw HttpException(errMsg);
+    }
+
+    var diffNoise = originalAnalyzeNoiseAverage.abs() - analyzeNoiseAverage.abs();
+    logger.i("$diffNoise");
+
+  }
+
+  void _startEqualizing(int idx, String urlsJson, {bool isOriginal = false} ) async {
+
+    String basicAuth = "Bearer ${_apiPreferences.read<String>('access_token')}";
+    //print(basicAuth);
+
+    var decodedUrlJson = jsonDecode(urlsJson);
+    //print(decodedUrlJson['urls'][idx]['input']);
+    //print(decodedUrlJson['urls'][idx]['output']);
+
+  
+    Uri uri = Uri.parse("https://api.dolby.com/media/enhance");
+    Map<String, String> header = {
+      'authorization': basicAuth,
+      'content-type': "application/json",
+    };
+    
+    Map<String, dynamic> data = 
+    (isOriginal) 
+    ? {
+        "audio":{
+                  "loudness": { "enable": false },
+                  "dynamics": { "range_control": { "enable": false } },
+                  "filter": { "high_pass": { "enable": false } },
+                  "noise": { "reduction": { "enable": true } },
+                  "speech": {
+                    "sibilance": { "reduction": { "enable": false } },
+                    "isolation": { "enable": true, "amount": 100 }
+                  }
+                },
+        "input": decodedUrlJson['urls'][idx]['originalinput'],
+        "output": decodedUrlJson['urls'][idx]['originalouput']
+      }
+    : {
+        "audio":{
+                  "loudness": { "enable": false },
+                  "dynamics": { "range_control": { "enable": false } },
+                  "filter": { "high_pass": { "enable": false } },
+                  "noise": { "reduction": { "enable": true } },
+                  "speech": {
+                    "sibilance": { "reduction": { "enable": false } },
+                    "isolation": { "enable": true, "amount": 100 }
+                  }
+                },
+        "input": decodedUrlJson['urls'][idx]['input'],
+        "output": decodedUrlJson['urls'][idx]['output']
+    };
+
+    try {
+
+      final response = await post(uri, headers: header ,body:jsonEncode(data));
+      
+
+      if (response.statusCode != 200)throw HttpException('${response.statusCode} / ${response.body}');
+
+      logger.i("${response.statusCode} / ${response.body}");
+      logger.i("$idx - Equalizing Start");
+
+      // var selidx1 = "A${idx+4}";
+      // _apiPreferences.write_excel(selidx1,idx+1);
+      // var selidx2 = "B${idx+4}";
+
+      // _apiPreferences.write_excel(selidx2,DateTime.now().toLocal().toString());
+
+      var decodedResponse = jsonDecode(utf8.decode(response.bodyBytes)) as Map;
+      (isOriginal) ? _apiPreferences.write('equalize_original_job_id_$idx', decodedResponse['job_id']) 
+                    : _apiPreferences.write('equalize_job_id_$idx', decodedResponse['job_id']);
+      
+      
+
+      Timer.periodic(
+      const Duration(milliseconds: TIMER_PERIODIC_MS), 
+      (timer) {
+
+        var res = (isOriginal) ? _checkEqualizeStatus(idx,isOriginal: true) : _checkEqualizeStatus(idx);
+        res.then((val) {
+          var decodedUrlJson = jsonDecode(val);
+          print(decodedUrlJson['status']);
+
+          if(decodedUrlJson['status'] == 'Success'){
+            logger.i("$idx - Equalizing End");
+
+            //var selidx1 = "C${idx+4}";
+            //_apiPreferences.write_excel(selidx1,DateTime.now().toLocal().toString());
+
+            timer.cancel();
+          }
+          else{
+            String doingMsg = "Running ${idx} : ${decodedUrlJson['progress']}";
+            logger.e(doingMsg);
+          }
+
+        }).catchError((error) {
+          // error가 해당 에러를 출력
+          print('error: $error');
+        });
+
+    });
+      
+    } on SocketException {
+      String errMsg = "No Internet connection 😑";
+      logger.e(errMsg);
+      throw SocketException(errMsg);
+    } on HttpException catch (e) {
+      String errMsg = "Couldn't find the post 😱 ${e}";
+      logger.e(errMsg);
+      throw HttpException(errMsg);
+    }
+  }
+
+  Future<String> _checkEqualizeStatus(int idx,{bool isOriginal = false}) async {
+
+    Uri uri;
+    if(isOriginal){
+      uri = Uri.https("api.dolby.com", "/media/enhance", {"job_id":_apiPreferences.read<String>('equalize_original_job_id_$idx')});
+    }
+    else{
+      uri = Uri.https("api.dolby.com", "/media/enhance", {"job_id":_apiPreferences.read<String>('equalize_job_id_$idx')});
+    }
+    //print(uri);
+
+    Map<String, String> header = {
+      'authorization': "Bearer ${_apiPreferences.read<String>('access_token')}",
+      'content-type': "application/json",
+    };
+
+
+    late Response response;
+
+    try {
+      response = await get(uri, headers: header);
+
+      if (response.statusCode != 200)throw HttpException('${response.statusCode} / ${response.body}');
+
+      logger.i("${response.statusCode} / ${response.body}");
+
+    } on SocketException {
+      String errMsg = "No Internet connection 😑";
+      logger.e(errMsg);
+      throw SocketException(errMsg);
+    } on HttpException catch (e) {
+      String errMsg = "Couldn't find the post 😱 ${e}";
+      logger.e(errMsg);
+      throw HttpException(errMsg);
+    }
+
+    return response.body;
+  }
 
 }
