@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'dart:core';
 import 'dart:io';
 
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:logger/logger.dart';
 import 'package:path/path.dart' as p;
 import 'package:excel/excel.dart';
@@ -270,8 +271,8 @@ class DolbyAPIManager{
   }
 
   void _getToken() async {
-    String appkey = ENV['DolbyMediaAPIAppKey']!;
-    String appsecret = ENV['DolbyMediaAPIAppSecretKey']!;
+    String appkey = dotenv.env['DolbyMediaAPIAppKey']!;
+    String appsecret = dotenv.env['DolbyMediaAPIAppSecretKey']!;
     String basicAuth = 'Basic ${base64.encode(utf8.encode('$appkey:$appsecret'))}';
     print(basicAuth);
 
@@ -622,12 +623,18 @@ class DolbyAPIManager{
           print(decodedUrlJson['status']);
 
           if(decodedUrlJson['status'] == 'Success'){
+            timer.cancel();
             logger.i("$idx - Analyzing End");
 
             //var selidx1 = "C${idx+4}";
            // _apiPreferences.write_excel(selidx1,DateTime.now().toLocal().toString());
 
-            timer.cancel();
+            var jsonurl = _getAnalyzeJson(idx);
+            jsonurl.then((value) {
+              _compareAnalyzeData(idx, value);
+              logger.i("$idx - Compare Analyzing End");
+            });
+
           }
           else{
             String doingMsg = "Running ${idx} : ${decodedUrlJson['progress']}";
@@ -691,7 +698,7 @@ class DolbyAPIManager{
     return response.body;
   }
 
-  void _compareAnalyzeData(int idx, String urlsJson, {bool isOriginal = false} ) async {
+  void _compareAnalyzeData(int idx, String urlsJson ) async {
 
     var decodedUrlJson = jsonDecode(urlsJson);
     //print(decodedUrlJson['originalAnalyzejson']);
@@ -741,7 +748,7 @@ class DolbyAPIManager{
       analyzeNoiseAverage = decodedResponse['processed_region']['audio']['noise']['level_average'];
 
     } on SocketException {
-      String errMsg = "No Internet connection 😑";
+      String errMsg = "No Internet connection 😑 / $idx";
       logger.e(errMsg);
       throw SocketException(errMsg);
     } on HttpException catch (e) {
@@ -834,12 +841,12 @@ class DolbyAPIManager{
           print(decodedUrlJson['status']);
 
           if(decodedUrlJson['status'] == 'Success'){
+            timer.cancel();
             logger.i("$idx - Equalizing End");
 
             //var selidx1 = "C${idx+4}";
             //_apiPreferences.write_excel(selidx1,DateTime.now().toLocal().toString());
 
-            timer.cancel();
           }
           else{
             String doingMsg = "Running ${idx} : ${decodedUrlJson['progress']}";

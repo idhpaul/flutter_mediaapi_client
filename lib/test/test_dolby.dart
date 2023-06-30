@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_mediaapi_client/src/media_api_handle.dart';
 import 'package:flutter_mediaapi_client/src/util/env.dart';
 import 'package:http/http.dart';
@@ -36,8 +37,8 @@ class _DolbyClientState extends State<DolbyClient> {
         OutlinedButton(
             child: const Text("Get Auth"),
             onPressed: () async {
-              String appkey = ENV['DolbyMediaAPIAppKey']!;
-              String appsecret = ENV['DolbyMediaAPIAppSecretKey']!;
+              String appkey = dotenv.env['DolbyMediaAPIAppKey']!;
+              String appsecret = dotenv.env['DolbyMediaAPIAppSecretKey']!;
               String basicAuth = 'Basic ${base64.encode(utf8.encode('$appkey:$appsecret'))}';
               print(basicAuth);
 

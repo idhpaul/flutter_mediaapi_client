@@ -1,14 +1,9 @@
-import 'dart:io';
-
-import 'package:dotenv/dotenv.dart';
 import 'package:logger/logger.dart';
-
-// ignore: non_constant_identifier_names
-final DotEnv ENV = DotEnv(includePlatformEnvironment: true)..load();
-                
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+        
 // ignore: non_constant_identifier_names
 void EnvDefinedCheck() {
-  assert(ENV.isEveryDefined([
+  assert(dotenv.isEveryDefined([
     'DolbyMediaAPIAppKey',
     'DolbyMediaAPIAppSecretKey',
     ]) ? true : 
