@@ -1,4 +1,4 @@
-// ignore_for_file: constant_identifier_names
+
 
 import 'dart:async';
 import 'dart:convert';
@@ -6,16 +6,17 @@ import 'dart:core';
 import 'dart:io';
 
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:logger/logger.dart';
+import 'package:flutter_mediaapi_client/src/constant.dart';
 import 'package:path/path.dart' as p;
+import 'package:logger/logger.dart';
 import 'package:excel/excel.dart';
 import 'package:flutter_mediaapi_client/src/util/env.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:schedulers/schedulers.dart';
 import 'package:http/http.dart';
 
-const int TIMER_PERIODIC_MS = 1000;
 
+final task = <Future>[];
 
 enum APIReturnType {
   ERROR,
@@ -35,21 +36,25 @@ class APIPreferences {
 
   void init() async {
     prefs = await SharedPreferences.getInstance();
-    excel = Excel.createExcel();
-    sheet = excel['Enhance Result'];
 
+    var now = DateTime.now();
+
+    excel = Excel.createExcel();
+    sheet = excel['${now.month}.${now.day}_${now.hour}`${now.minute}'];
+
+    
+    // Enhance runtime
     var headCell1 = sheet.cell(CellIndex.indexByString("A3"));
-    headCell1.value = "index";
+    headCell1.value = "Index";
 
     var headCell2 = sheet.cell(CellIndex.indexByString("B3"));
-    headCell2.value = "Start Enhance";
+    headCell2.value = "Original Noise Evaluation";
 
     var headCell3 = sheet.cell(CellIndex.indexByString("C3"));
-    headCell3.value = "End Enhance";
+    headCell3.value = "Enhance Noise Evaluation";
 
     var headCell4 = sheet.cell(CellIndex.indexByString("D3"));
-    headCell4.value = "Run Time";
-
+    headCell4.value = "Reduce Noise db";
   }
 
   void reload(){
@@ -139,6 +144,8 @@ class APIHandler{
   final intervalScheduler = IntervalScheduler(delay: const Duration(seconds: 1));
 
   bool hasToken = false;
+
+  
 
   APIHandler(){
 
@@ -238,12 +245,29 @@ class APIHandler{
   }
 
   void startEnhancing(int idx, String urlsJson){
-    _apiManager._startEnhancing(idx, urlsJson);
+    task.clear();
+    task.add(_apiManager._startEnhancing(idx, urlsJson));
+  }
+
+  Future<int> waitEnhancing() async {
+    
+    await Future.wait(task);
+
+    return 1;
+    
   }
 
   void startAnalyze(int idx, String urlsJson){
-    _apiManager._startAnalyzing(idx, urlsJson, isOriginal:true);
-    _apiManager._startAnalyzing(idx, urlsJson);
+    task.clear();
+    task.add(_apiManager._startAnalyzing(idx, urlsJson, isOriginal:true));
+    task.add(_apiManager._startAnalyzing(idx, urlsJson));
+  }
+
+  Future<int> waitEnhancingEvaluation() async {
+
+    await Future.wait(task);
+
+    return 1;
   }
 
   void compareAnalyzeData(int idx, String urlsJson){
@@ -251,7 +275,15 @@ class APIHandler{
   }
 
   void startEqualize(int idx, String urlsJson){
-    _apiManager._startEqualizing(idx, urlsJson);
+    task.clear();
+    task.add(_apiManager._startEqualizing(idx, urlsJson));
+  }
+
+  Future<int> waitEqualize() async {
+
+    await Future.wait(task);
+
+    return 1;
   }
 
   void saveData(){
@@ -452,7 +484,7 @@ class DolbyAPIManager{
     return response.body;
   }
 
-  void _startEnhancing(int idx, String urlsJson) async {
+  Future<void> _startEnhancing(int idx, String urlsJson) async {
 
     String basicAuth = "Bearer ${_apiPreferences.read<String>('access_token')}";
     //print(basicAuth);
@@ -483,19 +515,19 @@ class DolbyAPIManager{
       logger.i("${response.statusCode} / ${response.body}");
       logger.i("$idx - Enhancing Start");
 
-      var selidx1 = "A${idx+4}";
-      _apiPreferences.write_excel(selidx1,idx+1);
-      var selidx2 = "B${idx+4}";
+      //var selidx1 = "A${idx+4}";
+      //_apiPreferences.write_excel(selidx1,idx+1);
+      //var selidx2 = "B${idx+4}";
 
-      _apiPreferences.write_excel(selidx2,DateTime.now().toLocal().toString());
+      //_apiPreferences.write_excel(selidx2,DateTime.now().toLocal().toString());
 
       var decodedResponse = jsonDecode(utf8.decode(response.bodyBytes)) as Map;
       _apiPreferences.write('enhance_job_id_$idx', decodedResponse['job_id']);
 
-      Timer.periodic(
-      const Duration(milliseconds: TIMER_PERIODIC_MS), 
-      (timer) {
 
+      bool isRun = true;
+      while (isRun) {
+       
         var res = _checkEnhancingStatus(idx);
         res.then((val) {
           var decodedUrlJson = jsonDecode(val);
@@ -504,22 +536,53 @@ class DolbyAPIManager{
           if(decodedUrlJson['status'] == 'Success'){
             logger.i("$idx - Enhancing End");
 
-            var selidx1 = "C${idx+4}";
-            _apiPreferences.write_excel(selidx1,DateTime.now().toLocal().toString());
+            //var selidx1 = "C${idx+4}";
+            //_apiPreferences.write_excel(selidx1,DateTime.now().toLocal().toString());
 
-            timer.cancel();
+            //timer.cancel();
+            isRun = false;
           }
           else{
-            String doingMsg = "Running ${idx} : ${decodedUrlJson['progress']}";
-            logger.e(doingMsg);
+            
+            //String doingMsg = "Running(${identityHashCode(this)}) ${idx} : ${decodedUrlJson['progress']}";
+            //logger.e(doingMsg);
           }
-
-        }).catchError((error) {
-          // error가 해당 에러를 출력
-          print('error: $error');
         });
 
-    });
+        await Future.delayed(const Duration(milliseconds : MEDIA_API_TIMER_PERIODIC_MS));
+
+      }
+
+
+      // Timer.periodic(
+      // const Duration(milliseconds: TIMER_PERIODIC_MS), 
+      // (timer) 
+      // {
+      //   var res = _checkEnhancingStatus(idx);
+      //   res.then((val) {
+      //     var decodedUrlJson = jsonDecode(val);
+      //     print(decodedUrlJson['status']);
+
+      //     if(decodedUrlJson['status'] == 'Success'){
+      //       logger.i("$idx - Enhancing End");
+
+      //       var selidx1 = "C${idx+4}";
+      //       _apiPreferences.write_excel(selidx1,DateTime.now().toLocal().toString());
+
+      //       timer.cancel();
+      //     }
+      //     else{
+            
+      //       String doingMsg = "Running(${identityHashCode(this)}) ${idx} : ${decodedUrlJson['progress']}";
+      //       logger.e(doingMsg);
+      //     }
+
+      //   }).catchError((error) {
+      //     // error가 해당 에러를 출력
+      //     print('error: $error');
+      //   });
+
+      // });
       
     } on SocketException {
       String errMsg = "No Internet connection 😑";
@@ -530,6 +593,10 @@ class DolbyAPIManager{
       logger.e(errMsg);
       throw HttpException(errMsg);
     }
+
+
+    //String doingMsg = "Run Done ${idx}";
+    //logger.v(doingMsg);
   }
 
   Future<String> _checkEnhancingStatus(int idx) async {
@@ -563,7 +630,7 @@ class DolbyAPIManager{
     return response.body;
   }
 
-  void _startAnalyzing(int idx, String urlsJson, {bool isOriginal = false} ) async {
+  Future<void> _startAnalyzing(int idx, String urlsJson, {bool isOriginal = false} ) async {
 
     String basicAuth = "Bearer ${_apiPreferences.read<String>('access_token')}";
     //print(basicAuth);
@@ -612,18 +679,15 @@ class DolbyAPIManager{
                     : _apiPreferences.write('analyze_job_id_$idx', decodedResponse['job_id']);
       
       
-
-      Timer.periodic(
-      const Duration(milliseconds: TIMER_PERIODIC_MS), 
-      (timer) {
-
+      bool isRun = true;
+      while (isRun) {
         var res = (isOriginal) ? _checkAnalyzeStatus(idx,isOriginal: true) : _checkAnalyzeStatus(idx);
         res.then((val) {
           var decodedUrlJson = jsonDecode(val);
           print(decodedUrlJson['status']);
 
           if(decodedUrlJson['status'] == 'Success'){
-            timer.cancel();
+            isRun = false;
             logger.i("$idx - Analyzing End");
 
             //var selidx1 = "C${idx+4}";
@@ -637,16 +701,47 @@ class DolbyAPIManager{
 
           }
           else{
-            String doingMsg = "Running ${idx} : ${decodedUrlJson['progress']}";
-            logger.e(doingMsg);
+            //String doingMsg = "Running ${idx} : ${decodedUrlJson['progress']}";
+            //logger.e(doingMsg);
           }
-
-        }).catchError((error) {
-          // error가 해당 에러를 출력
-          print('error: $error');
         });
 
-    });
+        await Future.delayed(const Duration(milliseconds : MEDIA_API_TIMER_PERIODIC_MS));
+      }
+    //   Timer.periodic(
+    //   const Duration(milliseconds: TIMER_PERIODIC_MS), 
+    //   (timer) {
+
+    //     var res = (isOriginal) ? _checkAnalyzeStatus(idx,isOriginal: true) : _checkAnalyzeStatus(idx);
+    //     res.then((val) {
+    //       var decodedUrlJson = jsonDecode(val);
+    //       print(decodedUrlJson['status']);
+
+    //       if(decodedUrlJson['status'] == 'Success'){
+    //         timer.cancel();
+    //         logger.i("$idx - Analyzing End");
+
+    //         //var selidx1 = "C${idx+4}";
+    //        // _apiPreferences.write_excel(selidx1,DateTime.now().toLocal().toString());
+
+    //         var jsonurl = _getAnalyzeJson(idx);
+    //         jsonurl.then((value) {
+    //           _compareAnalyzeData(idx, value);
+    //           logger.i("$idx - Compare Analyzing End");
+    //         });
+
+    //       }
+    //       else{
+    //         String doingMsg = "Running ${idx} : ${decodedUrlJson['progress']}";
+    //         logger.e(doingMsg);
+    //       }
+
+    //     }).catchError((error) {
+    //       // error가 해당 에러를 출력
+    //       print('error: $error');
+    //     });
+
+    // });
       
     } on SocketException {
       String errMsg = "No Internet connection 😑";
@@ -725,6 +820,11 @@ class DolbyAPIManager{
       var decodedResponse = jsonDecode(utf8.decode(response.bodyBytes)) as Map;
       originalAnalyzeNoiseAverage = decodedResponse['processed_region']['audio']['noise']['level_average'];
 
+      var selIdx = "A${idx+4}";
+      _apiPreferences.write_excel(selIdx,idx+1);
+      var selOriginalEvaluation = "B${idx+4}";
+      _apiPreferences.write_excel(selOriginalEvaluation,originalAnalyzeNoiseAverage.abs());
+
     } on SocketException {
       String errMsg = "No Internet connection 😑";
       logger.e(errMsg);
@@ -747,6 +847,9 @@ class DolbyAPIManager{
       var decodedResponse = jsonDecode(utf8.decode(response.bodyBytes)) as Map;
       analyzeNoiseAverage = decodedResponse['processed_region']['audio']['noise']['level_average'];
 
+      var selEnhaceEvaluation = "C${idx+4}";
+      _apiPreferences.write_excel(selEnhaceEvaluation,analyzeNoiseAverage.abs());
+
     } on SocketException {
       String errMsg = "No Internet connection 😑 / $idx";
       logger.e(errMsg);
@@ -758,11 +861,14 @@ class DolbyAPIManager{
     }
 
     var diffNoise = originalAnalyzeNoiseAverage.abs() - analyzeNoiseAverage.abs();
-    logger.i("$diffNoise");
+    //logger.i("$diffNoise");
+
+    var selReduce = "D${idx+4}";
+    _apiPreferences.write_excel(selReduce,diffNoise);
 
   }
 
-  void _startEqualizing(int idx, String urlsJson, {bool isOriginal = false} ) async {
+  Future<void> _startEqualizing(int idx, String urlsJson, {bool isOriginal = false} ) async {
 
     String basicAuth = "Bearer ${_apiPreferences.read<String>('access_token')}";
     //print(basicAuth);
@@ -830,18 +936,15 @@ class DolbyAPIManager{
                     : _apiPreferences.write('equalize_job_id_$idx', decodedResponse['job_id']);
       
       
-
-      Timer.periodic(
-      const Duration(milliseconds: TIMER_PERIODIC_MS), 
-      (timer) {
-
+      bool isRun = true;
+      while (isRun) {
         var res = (isOriginal) ? _checkEqualizeStatus(idx,isOriginal: true) : _checkEqualizeStatus(idx);
         res.then((val) {
           var decodedUrlJson = jsonDecode(val);
           print(decodedUrlJson['status']);
 
           if(decodedUrlJson['status'] == 'Success'){
-            timer.cancel();
+            isRun = false;
             logger.i("$idx - Equalizing End");
 
             //var selidx1 = "C${idx+4}";
@@ -852,13 +955,38 @@ class DolbyAPIManager{
             String doingMsg = "Running ${idx} : ${decodedUrlJson['progress']}";
             logger.e(doingMsg);
           }
-
-        }).catchError((error) {
-          // error가 해당 에러를 출력
-          print('error: $error');
         });
 
-    });
+        await Future.delayed(const Duration(milliseconds : MEDIA_API_TIMER_PERIODIC_MS));
+      }
+    //   Timer.periodic(
+    //   const Duration(milliseconds: TIMER_PERIODIC_MS), 
+    //   (timer) {
+
+    //     var res = (isOriginal) ? _checkEqualizeStatus(idx,isOriginal: true) : _checkEqualizeStatus(idx);
+    //     res.then((val) {
+    //       var decodedUrlJson = jsonDecode(val);
+    //       print(decodedUrlJson['status']);
+
+    //       if(decodedUrlJson['status'] == 'Success'){
+    //         timer.cancel();
+    //         logger.i("$idx - Equalizing End");
+
+    //         //var selidx1 = "C${idx+4}";
+    //         //_apiPreferences.write_excel(selidx1,DateTime.now().toLocal().toString());
+
+    //       }
+    //       else{
+    //         String doingMsg = "Running ${idx} : ${decodedUrlJson['progress']}";
+    //         logger.e(doingMsg);
+    //       }
+
+    //     }).catchError((error) {
+    //       // error가 해당 에러를 출력
+    //       print('error: $error');
+    //     });
+
+    // });
       
     } on SocketException {
       String errMsg = "No Internet connection 😑";

@@ -1,11 +1,12 @@
 import 'dart:async';
 
-import 'package:async_button_builder/async_button_builder.dart';
-import 'package:slide_countdown/slide_countdown.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:async_button_builder/async_button_builder.dart';
 import 'package:stop_watch_timer/stop_watch_timer.dart';
+
+import 'package:flutter_mediaapi_client/src/constant.dart';
 import 'package:flutter_mediaapi_client/src/media_api_handle.dart';
 import 'package:flutter_mediaapi_client/src/util/env.dart';
 import 'package:flutter_mediaapi_client/src/widget/token_condition_widget.dart';
@@ -73,7 +74,9 @@ class _MyHomePageState extends State<MyHomePage> {
   final enhanceTextFieldController = TextEditingController();
   final analyzeTextFieldController = TextEditingController();
 
-  int lastMiliSecondTime = 0;
+  int lastNoiseRunningTime = 0;
+  int lastNoiseEvaluationTime = 0;
+  int lastEqualizeRunningTime = 0;
 
   final StopWatchTimer _stopWatchTimer = StopWatchTimer(
     mode: StopWatchMode.countUp,
@@ -325,19 +328,16 @@ class _MyHomePageState extends State<MyHomePage> {
                                     });
                                 throw 'Data empty';
                               } else {
-                                int inputNum =
-                                    int.parse(enhanceTextFieldController.text);
+                                int inputNum = int.parse(enhanceTextFieldController.text);
 
-                                lastMiliSecondTime = 0;
+                                lastNoiseRunningTime = 0;
                                 _stopWatchTimer.onStartTimer();
 
-                                if (0 < inputNum && inputNum <= 10) {
+                                if (0 < inputNum && inputNum <= MAIN_TEXTCONTROLLER_SAMPLE_COUNT) {
                                   print('노이즈캔슬링 시작');
 
                                   // #1 request job
-                                  var res =
-                                      apiHandler.createPreSignEnhance(inputNum);
-                                  res.then((val) {
+                                  await apiHandler.createPreSignEnhance(inputNum).then((val) {
                                     print('주소 생성 완료');
                                     // 2 노이즈캔슬링 시작 (순차형, 분산형 방법 미정)
                                     // param - 생성된 링크 배열
@@ -352,13 +352,23 @@ class _MyHomePageState extends State<MyHomePage> {
                                   });
 
                                   // #2 wait job is done and stop timer
-                                  await Future.delayed(
-                                      const Duration(seconds: 30), () {
+                                  await apiHandler.waitEnhancing().then((value){
+                                    
+                                    print("Enhancing is finished");
+
                                     setState(() {
                                       _stopWatchTimer.onStopTimer();
                                       _stopWatchTimer.onResetTimer();
                                     });
                                   });
+
+                                  // // #2 wait job is done and stop timer
+                                  // await Future.delayed(const Duration(seconds: 30), () {
+                                  //   setState(() {
+                                  //     _stopWatchTimer.onStopTimer();
+                                  //     _stopWatchTimer.onResetTimer();
+                                  //   });
+                                  // });
                                 } else {
                                   showDialog(
                                       context: context,
@@ -388,6 +398,12 @@ class _MyHomePageState extends State<MyHomePage> {
                                 }
                               }
                             },
+                            onError: () {
+                              setState(() {
+                                      _stopWatchTimer.onStopTimer();
+                                      _stopWatchTimer.onResetTimer();
+                                    });
+                            },
                             loadingWidget: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               crossAxisAlignment: CrossAxisAlignment.center,
@@ -411,7 +427,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                     final displayTime =
                                         StopWatchTimer.getDisplayTime(value,
                                             hours: false);
-                                    lastMiliSecondTime = value;
+                                    lastNoiseRunningTime = value;
                                     return Column(
                                       children: <Widget>[
                                         Padding(
@@ -458,7 +474,7 @@ class _MyHomePageState extends State<MyHomePage> {
                               );
                             },
                             child:
-                                Text('Run Noise  < $lastMiliSecondTime ms >'),
+                                Text('Run Noise  < $lastNoiseRunningTime ms >'),
                           )),
                     ),
                   ],
@@ -586,16 +602,14 @@ class _MyHomePageState extends State<MyHomePage> {
                                 int inputNum =
                                     int.parse(enhanceTextFieldController.text);
 
-                                lastMiliSecondTime = 0;
+                                lastNoiseEvaluationTime = 0;
                                 _stopWatchTimer.onStartTimer();
 
-                                if (0 < inputNum && inputNum <= 10) {
+                                if (0 < inputNum && inputNum <= MAIN_TEXTCONTROLLER_SAMPLE_COUNT) {
                                   print('노이즈캔슬링 평가 시작');
 
                                   // #1 request job
-                                  var res =
-                                      apiHandler.createPreSignAnalyze(inputNum);
-                                  res.then((val) {
+                                  await apiHandler.createPreSignAnalyze(inputNum).then((val) {
                                     print('주소 생성 완료');
                                     // 2 음성 분석 시작 (순차형, 분산형 방법 미정)
                                     for (var idx = 0; idx < inputNum; idx++) {
@@ -608,8 +622,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                   });
 
                                   // #2 wait job is done and stop timer
-                                  await Future.delayed(
-                                      const Duration(seconds: 30), () {
+                                  await apiHandler.waitEnhancingEvaluation().then((value){
                                     for (var idx = 0; idx < inputNum; idx++) {
                                       var res = apiHandler.getAnalyzeJson(idx);
                                       res.then((val) {
@@ -626,6 +639,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                       _stopWatchTimer.onResetTimer();
                                     });
                                   });
+
                                 } else {
                                   showDialog(
                                       context: context,
@@ -655,6 +669,12 @@ class _MyHomePageState extends State<MyHomePage> {
                                 }
                               }
                             },
+                            onError: () {
+                              setState(() {
+                                      _stopWatchTimer.onStopTimer();
+                                      _stopWatchTimer.onResetTimer();
+                                    });
+                            },
                             loadingWidget: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               crossAxisAlignment: CrossAxisAlignment.center,
@@ -678,7 +698,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                     final displayTime =
                                         StopWatchTimer.getDisplayTime(value,
                                             hours: false);
-                                    lastMiliSecondTime = value;
+                                    lastNoiseEvaluationTime = value;
                                     return Column(
                                       children: <Widget>[
                                         Padding(
@@ -725,7 +745,7 @@ class _MyHomePageState extends State<MyHomePage> {
                               );
                             },
                             child:
-                                Text('Run Noise  < $lastMiliSecondTime ms >'),
+                                Text('Run Noise Evaluation < $lastNoiseEvaluationTime ms >'),
                           )),
                     ),
                   ],
@@ -861,16 +881,14 @@ class _MyHomePageState extends State<MyHomePage> {
                                 int inputNum =
                                     int.parse(enhanceTextFieldController.text);
 
-                                lastMiliSecondTime = 0;
+                                lastEqualizeRunningTime = 0;
                                 _stopWatchTimer.onStartTimer();
 
-                                if (0 < inputNum && inputNum <= 10) {
+                                if (0 < inputNum && inputNum <= MAIN_TEXTCONTROLLER_SAMPLE_COUNT) {
                                   print('이퀄라이징 시작');
 
                                   // #1 request job
-                                  var res = apiHandler
-                                      .createPreSignEqualize(inputNum);
-                                  res.then((val) {
+                                  await apiHandler.createPreSignEqualize(inputNum).then((val) {
                                     print('주소 생성 완료');
                                     // 이퀄라이징 시작
                                     for (var idx = 0; idx < inputNum; idx++) {
@@ -883,8 +901,8 @@ class _MyHomePageState extends State<MyHomePage> {
                                   });
 
                                   // #2 wait job is done and stop timer
-                                  await Future.delayed(
-                                      const Duration(seconds: 30), () {
+                                  await apiHandler.waitEqualize().then((value){
+
                                     setState(() {
                                       _stopWatchTimer.onStopTimer();
                                       _stopWatchTimer.onResetTimer();
@@ -942,7 +960,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                     final displayTime =
                                         StopWatchTimer.getDisplayTime(value,
                                             hours: false);
-                                    lastMiliSecondTime = value;
+                                    lastEqualizeRunningTime = value;
                                     return Column(
                                       children: <Widget>[
                                         Padding(
@@ -989,7 +1007,7 @@ class _MyHomePageState extends State<MyHomePage> {
                               );
                             },
                             child: Text(
-                                'Run Equalize  < $lastMiliSecondTime ms >'),
+                                'Run Equalize  < $lastEqualizeRunningTime ms >'),
                           )),
                     ),
                   ],
@@ -1117,10 +1135,10 @@ class _MyHomePageState extends State<MyHomePage> {
                                 int inputNum =
                                     int.parse(enhanceTextFieldController.text);
 
-                                lastMiliSecondTime = 0;
+                                lastNoiseRunningTime = 0;
                                 _stopWatchTimer.onStartTimer();
 
-                                if (0 < inputNum && inputNum <= 10) {
+                                if (0 < inputNum && inputNum <= MAIN_TEXTCONTROLLER_SAMPLE_COUNT) {
                                   print('이퀄라이징 평가 시작');
 
                                   // #1 request job
@@ -1178,6 +1196,12 @@ class _MyHomePageState extends State<MyHomePage> {
                                 }
                               }
                             },
+                            onError: () {
+                              setState(() {
+                                      _stopWatchTimer.onStopTimer();
+                                      _stopWatchTimer.onResetTimer();
+                                    });
+                            },
                             loadingWidget: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               crossAxisAlignment: CrossAxisAlignment.center,
@@ -1201,7 +1225,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                     final displayTime =
                                         StopWatchTimer.getDisplayTime(value,
                                             hours: false);
-                                    lastMiliSecondTime = value;
+                                    lastNoiseRunningTime = value;
                                     return Column(
                                       children: <Widget>[
                                         Padding(
@@ -1248,7 +1272,7 @@ class _MyHomePageState extends State<MyHomePage> {
                               );
                             },
                             child:
-                                Text('Run Equalize  < $lastMiliSecondTime ms >'),
+                                Text('Run Equalize  < $lastNoiseRunningTime ms >'),
                           )),
                     ),
                   ],
