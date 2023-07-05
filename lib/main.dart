@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:async_button_builder/async_button_builder.dart';
+import 'package:flutter_mediaapi_client/src/dialog/error_dialog.dart';
 import 'package:stop_watch_timer/stop_watch_timer.dart';
 
 import 'package:flutter_mediaapi_client/src/constant.dart';
@@ -302,30 +303,8 @@ class _MyHomePageState extends State<MyHomePage> {
                           child: AsyncButtonBuilder(
                             onPressed: () async {
                               if (enhanceTextFieldController.text.isEmpty) {
-                                showDialog(
-                                    context: context,
-                                    barrierDismissible:
-                                        true, // 바깥 영역 터치시 닫을지 여부
-                                    builder: (BuildContext context) {
-                                      return AlertDialog(
-                                        title: const Text('에러'),
-                                        content: SingleChildScrollView(
-                                          child: ListBody(
-                                            children: const <Widget>[
-                                              Text('값을 입력하세요'),
-                                            ],
-                                          ),
-                                        ),
-                                        actions: <Widget>[
-                                          TextButton(
-                                            child: const Text('확인'),
-                                            onPressed: () {
-                                              Navigator.of(context).pop();
-                                            },
-                                          ),
-                                        ],
-                                      );
-                                    });
+                                errorDialog(context,'값을 입력하세요');
+
                                 throw 'Data empty';
                               } else {
                                 int inputNum = int.parse(enhanceTextFieldController.text);
@@ -346,6 +325,9 @@ class _MyHomePageState extends State<MyHomePage> {
                                       apiHandler.startEnhancing(idx, val);
                                     }
                                   }).catchError((error) async {
+
+                                    errorDialog(context,error.toString());
+                                    
                                     // error가 해당 에러를 출력
                                     print('error: $error');
                                     throw 'error';
@@ -370,30 +352,8 @@ class _MyHomePageState extends State<MyHomePage> {
                                   //   });
                                   // });
                                 } else {
-                                  showDialog(
-                                      context: context,
-                                      barrierDismissible:
-                                          true, // 바깥 영역 터치시 닫을지 여부
-                                      builder: (BuildContext context) {
-                                        return AlertDialog(
-                                          title: const Text('에러'),
-                                          content: SingleChildScrollView(
-                                            child: ListBody(
-                                              children: const <Widget>[
-                                                Text('범위내의 값을 입력하세요. (1~100)'),
-                                              ],
-                                            ),
-                                          ),
-                                          actions: <Widget>[
-                                            TextButton(
-                                              child: const Text('확인'),
-                                              onPressed: () {
-                                                Navigator.of(context).pop();
-                                              },
-                                            ),
-                                          ],
-                                        );
-                                      });
+                                  errorDialog(context,'범위내의 값을 입력하세요. (1~100)');
+                                  
                                   throw 'Out of Data range';
                                 }
                               }
@@ -573,30 +533,8 @@ class _MyHomePageState extends State<MyHomePage> {
                           child: AsyncButtonBuilder(
                             onPressed: () async {
                               if (enhanceTextFieldController.text.isEmpty) {
-                                showDialog(
-                                    context: context,
-                                    barrierDismissible:
-                                        true, // 바깥 영역 터치시 닫을지 여부
-                                    builder: (BuildContext context) {
-                                      return AlertDialog(
-                                        title: const Text('에러'),
-                                        content: SingleChildScrollView(
-                                          child: ListBody(
-                                            children: const <Widget>[
-                                              Text('값을 입력하세요'),
-                                            ],
-                                          ),
-                                        ),
-                                        actions: <Widget>[
-                                          TextButton(
-                                            child: const Text('확인'),
-                                            onPressed: () {
-                                              Navigator.of(context).pop();
-                                            },
-                                          ),
-                                        ],
-                                      );
-                                    });
+                                errorDialog(context,'값을 입력하세요');
+                                
                                 throw 'Data empty';
                               } else {
                                 int inputNum =
@@ -616,6 +554,9 @@ class _MyHomePageState extends State<MyHomePage> {
                                       apiHandler.startAnalyze(idx, val);
                                     }
                                   }).catchError((error) async {
+
+                                    errorDialog(context,error.toString());
+
                                     // error가 해당 에러를 출력
                                     print('error: $error');
                                     throw 'error';
@@ -641,30 +582,9 @@ class _MyHomePageState extends State<MyHomePage> {
                                   });
 
                                 } else {
-                                  showDialog(
-                                      context: context,
-                                      barrierDismissible:
-                                          true, // 바깥 영역 터치시 닫을지 여부
-                                      builder: (BuildContext context) {
-                                        return AlertDialog(
-                                          title: const Text('에러'),
-                                          content: SingleChildScrollView(
-                                            child: ListBody(
-                                              children: const <Widget>[
-                                                Text('범위내의 값을 입력하세요. (1~100)'),
-                                              ],
-                                            ),
-                                          ),
-                                          actions: <Widget>[
-                                            TextButton(
-                                              child: const Text('확인'),
-                                              onPressed: () {
-                                                Navigator.of(context).pop();
-                                              },
-                                            ),
-                                          ],
-                                        );
-                                      });
+
+                                  errorDialog(context,'범위내의 값을 입력하세요. (1~100)');
+                                  
                                   throw 'Out of Data range';
                                 }
                               }
@@ -852,30 +772,8 @@ class _MyHomePageState extends State<MyHomePage> {
                           child: AsyncButtonBuilder(
                             onPressed: () async {
                               if (enhanceTextFieldController.text.isEmpty) {
-                                showDialog(
-                                    context: context,
-                                    barrierDismissible:
-                                        true, // 바깥 영역 터치시 닫을지 여부
-                                    builder: (BuildContext context) {
-                                      return AlertDialog(
-                                        title: const Text('에러'),
-                                        content: SingleChildScrollView(
-                                          child: ListBody(
-                                            children: const <Widget>[
-                                              Text('값을 입력하세요'),
-                                            ],
-                                          ),
-                                        ),
-                                        actions: <Widget>[
-                                          TextButton(
-                                            child: const Text('확인'),
-                                            onPressed: () {
-                                              Navigator.of(context).pop();
-                                            },
-                                          ),
-                                        ],
-                                      );
-                                    });
+                                errorDialog(context,'값을 입력하세요');
+                                
                                 throw 'Data empty';
                               } else {
                                 int inputNum =
@@ -895,6 +793,9 @@ class _MyHomePageState extends State<MyHomePage> {
                                       apiHandler.startEqualize(idx, val);
                                     }
                                   }).catchError((error) async {
+
+                                    errorDialog(context,error.toString());
+
                                     // error가 해당 에러를 출력
                                     print('error: $error');
                                     throw 'error';
@@ -909,30 +810,9 @@ class _MyHomePageState extends State<MyHomePage> {
                                     });
                                   });
                                 } else {
-                                  showDialog(
-                                      context: context,
-                                      barrierDismissible:
-                                          true, // 바깥 영역 터치시 닫을지 여부
-                                      builder: (BuildContext context) {
-                                        return AlertDialog(
-                                          title: const Text('에러'),
-                                          content: SingleChildScrollView(
-                                            child: ListBody(
-                                              children: const <Widget>[
-                                                Text('범위내의 값을 입력하세요. (1~100)'),
-                                              ],
-                                            ),
-                                          ),
-                                          actions: <Widget>[
-                                            TextButton(
-                                              child: const Text('확인'),
-                                              onPressed: () {
-                                                Navigator.of(context).pop();
-                                              },
-                                            ),
-                                          ],
-                                        );
-                                      });
+
+                                  errorDialog(context,'범위내의 값을 입력하세요. (1~100)');
+                                  
                                   throw 'Out of Data range';
                                 }
                               }
@@ -1106,30 +986,8 @@ class _MyHomePageState extends State<MyHomePage> {
                           child: AsyncButtonBuilder(
                             onPressed: () async {
                               if (enhanceTextFieldController.text.isEmpty) {
-                                showDialog(
-                                    context: context,
-                                    barrierDismissible:
-                                        true, // 바깥 영역 터치시 닫을지 여부
-                                    builder: (BuildContext context) {
-                                      return AlertDialog(
-                                        title: const Text('에러'),
-                                        content: SingleChildScrollView(
-                                          child: ListBody(
-                                            children: const <Widget>[
-                                              Text('값을 입력하세요'),
-                                            ],
-                                          ),
-                                        ),
-                                        actions: <Widget>[
-                                          TextButton(
-                                            child: const Text('확인'),
-                                            onPressed: () {
-                                              Navigator.of(context).pop();
-                                            },
-                                          ),
-                                        ],
-                                      );
-                                    });
+                                errorDialog(context,'값을 입력하세요');
+                                
                                 throw 'Data empty';
                               } else {
                                 int inputNum =
@@ -1168,30 +1026,8 @@ class _MyHomePageState extends State<MyHomePage> {
                                     });
                                   });
                                 } else {
-                                  showDialog(
-                                      context: context,
-                                      barrierDismissible:
-                                          true, // 바깥 영역 터치시 닫을지 여부
-                                      builder: (BuildContext context) {
-                                        return AlertDialog(
-                                          title: const Text('에러'),
-                                          content: SingleChildScrollView(
-                                            child: ListBody(
-                                              children: const <Widget>[
-                                                Text('범위내의 값을 입력하세요. (1~100)'),
-                                              ],
-                                            ),
-                                          ),
-                                          actions: <Widget>[
-                                            TextButton(
-                                              child: const Text('확인'),
-                                              onPressed: () {
-                                                Navigator.of(context).pop();
-                                              },
-                                            ),
-                                          ],
-                                        );
-                                      });
+                                  errorDialog(context,'범위내의 값을 입력하세요. (1~100)');
+                                  
                                   throw 'Out of Data range';
                                 }
                               }

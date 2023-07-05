@@ -31,30 +31,18 @@ enum APIReturnType {
 class APIPreferences {
   
   late SharedPreferences prefs;
-  late Excel excel;
   late Sheet sheet;
+  late String excelOutputFile;
+
+  Excel excel = Excel.createExcel();
 
   void init() async {
     prefs = await SharedPreferences.getInstance();
 
     var now = DateTime.now();
+    excelOutputFile = '/Users/idhpaul/Desktop/output_${now.month}.${now.day}_${now.hour}`${now.minute}.xlsx';
 
-    excel = Excel.createExcel();
-    sheet = excel['${now.month}.${now.day}_${now.hour}`${now.minute}'];
-
-    
-    // Enhance runtime
-    var headCell1 = sheet.cell(CellIndex.indexByString("A3"));
-    headCell1.value = "Index";
-
-    var headCell2 = sheet.cell(CellIndex.indexByString("B3"));
-    headCell2.value = "Original Noise Evaluation";
-
-    var headCell3 = sheet.cell(CellIndex.indexByString("C3"));
-    headCell3.value = "Enhance Noise Evaluation";
-
-    var headCell4 = sheet.cell(CellIndex.indexByString("D3"));
-    headCell4.value = "Reduce Noise db";
+    excelCreate();
   }
 
   void reload(){
@@ -109,31 +97,50 @@ class APIPreferences {
     return returnValue;
   }
 
-  void write_excel(String cellIdx, dynamic data){
+  void excelCreate(){
+
+    sheet = excel['default'];
+    excel.setDefaultSheet(sheet.sheetName);
+    excel.delete('Sheet1');
+
+    // Enhance runtime
+    var headCell1 = sheet.cell(CellIndex.indexByString("A3"));
+    headCell1.value = "Index";
+
+    var headCell2 = sheet.cell(CellIndex.indexByString("B3"));
+    headCell2.value = "Original Noise Evaluation";
+
+    var headCell3 = sheet.cell(CellIndex.indexByString("C3"));
+    headCell3.value = "Enhance Noise Evaluation";
+
+    var headCell4 = sheet.cell(CellIndex.indexByString("D3"));
+    headCell4.value = "Reduce Noise db";
+  }
+
+  void excelWriteCell(String cellIdx, dynamic data){
     var cell = sheet.cell(CellIndex.indexByString(cellIdx));
     cell.value = data;
   }
 
-  void save_excel(){
-    print('Current path style: ${p.style}');
+  void excelSave(){
+   
+    sheet.setColAutoFit(1);
+    sheet.setColAutoFit(2);
+    sheet.setColAutoFit(3);
+    sheet.setColAutoFit(4);
 
-    print('Current process path: ${p.current}');
+    var now = DateTime.now();
+    excel.rename('default','${now.month}.${now.day}_${now.hour}`${now.minute}');
 
-    print('Separators');
-    for (var entry in [p.posix, p.windows, p.url]) {
-      print('  ${entry.style.toString().padRight(7)}: ${entry.separator}');
-    }
-
-    String outputFile = "/Users/idhpaul/Desktop/output.xlsx";
 
     List<int>? fileBytes = excel.save();
     if (fileBytes != null) {
-      File(p.join(outputFile))
+      File(p.join(excelOutputFile))
         ..createSync(recursive: true)
         ..writeAsBytesSync(fileBytes);
     }
 
-
+    excelCreate();
   }
 
 }
@@ -288,7 +295,7 @@ class APIHandler{
 
   void saveData(){
     // 시간 계산 : =TEXT(C4-B4,"mm:ss.000")
-    _apiPreferences.save_excel();
+    _apiPreferences.excelSave();
 
   }
 
@@ -820,10 +827,10 @@ class DolbyAPIManager{
       var decodedResponse = jsonDecode(utf8.decode(response.bodyBytes)) as Map;
       originalAnalyzeNoiseAverage = decodedResponse['processed_region']['audio']['noise']['level_average'];
 
-      var selIdx = "A${idx+4}";
-      _apiPreferences.write_excel(selIdx,idx+1);
-      var selOriginalEvaluation = "B${idx+4}";
-      _apiPreferences.write_excel(selOriginalEvaluation,originalAnalyzeNoiseAverage.abs());
+      var cellIdx = "A${idx+4}";
+      _apiPreferences.excelWriteCell(cellIdx,idx+1);
+      var cellOriginalEvaluation = "B${idx+4}";
+      _apiPreferences.excelWriteCell(cellOriginalEvaluation,originalAnalyzeNoiseAverage.abs());
 
     } on SocketException {
       String errMsg = "No Internet connection 😑";
@@ -847,8 +854,8 @@ class DolbyAPIManager{
       var decodedResponse = jsonDecode(utf8.decode(response.bodyBytes)) as Map;
       analyzeNoiseAverage = decodedResponse['processed_region']['audio']['noise']['level_average'];
 
-      var selEnhaceEvaluation = "C${idx+4}";
-      _apiPreferences.write_excel(selEnhaceEvaluation,analyzeNoiseAverage.abs());
+      var cellEnhaceEvaluation = "C${idx+4}";
+      _apiPreferences.excelWriteCell(cellEnhaceEvaluation,analyzeNoiseAverage.abs());
 
     } on SocketException {
       String errMsg = "No Internet connection 😑 / $idx";
@@ -863,8 +870,8 @@ class DolbyAPIManager{
     var diffNoise = originalAnalyzeNoiseAverage.abs() - analyzeNoiseAverage.abs();
     //logger.i("$diffNoise");
 
-    var selReduce = "D${idx+4}";
-    _apiPreferences.write_excel(selReduce,diffNoise);
+    var cellReduce = "D${idx+4}";
+    _apiPreferences.excelWriteCell(cellReduce,diffNoise);
 
   }
 
