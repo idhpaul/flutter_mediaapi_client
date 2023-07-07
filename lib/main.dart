@@ -75,9 +75,10 @@ class _MyHomePageState extends State<MyHomePage> {
   final enhanceTextFieldController = TextEditingController();
   final analyzeTextFieldController = TextEditingController();
 
-  int lastNoiseRunningTime = 0;
-  int lastNoiseEvaluationTime = 0;
-  int lastEqualizeRunningTime = 0;
+  late int lastNoiseRunningTime;
+  late int lastNoiseEvaluationTime;
+  late int lastEqualizeRunningTime;
+  late int lastEqualizeEvaluationTime;
 
   final StopWatchTimer _stopWatchTimer = StopWatchTimer(
     mode: StopWatchMode.countUp,
@@ -97,6 +98,11 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   void initState() {
     super.initState();
+
+    lastNoiseRunningTime = 0;
+    lastNoiseEvaluationTime = 0;
+    lastEqualizeRunningTime = 0;
+    lastEqualizeEvaluationTime = 0;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       stopwatch.stop();
@@ -993,38 +999,33 @@ class _MyHomePageState extends State<MyHomePage> {
                                 int inputNum =
                                     int.parse(enhanceTextFieldController.text);
 
-                                lastNoiseRunningTime = 0;
+                                lastEqualizeEvaluationTime = 0;
                                 _stopWatchTimer.onStartTimer();
 
                                 if (0 < inputNum && inputNum <= MAIN_TEXTCONTROLLER_SAMPLE_COUNT) {
                                   print('이퀄라이징 평가 시작');
 
                                   // #1 request job
-                                  // 1) request stt to go_server
-                                  // 2) wait stt result
-                                  // 3) compare('s3::stt/$_original.txt' and 's3::stt/$.txt) to use python cer code
-                                  
-                                  // var res = apiHandler.createPreSignEqualize(inputNum);
-                                  // res.then((val) {
-                                  //   print('주소 생성 완료');
-                                  //   // 이퀄라이징 평가 시작
-                                  //   for (var idx = 0; idx < inputNum; idx++) {
-                                  //     apiHandler.startEqualize(idx, val);
-                                  //   }
-                                  // }).catchError((error) async {
-                                  //   // error가 해당 에러를 출력
-                                  //   print('error: $error');
-                                  //   throw 'error';
-                                  // });
+                                  for (var idx = 0; idx < inputNum; idx++) {
+                                    apiHandler.startStt(idx);
+                                  }
 
                                   // #2 wait job is done and stop timer
-                                  await Future.delayed(const Duration(seconds: 30), () {
+                                  await apiHandler.waitStt().then((value){
+                                    
+                                    print("Stt is finished");
 
                                     setState(() {
                                       _stopWatchTimer.onStopTimer();
                                       _stopWatchTimer.onResetTimer();
                                     });
                                   });
+                                  
+                                  for (var idx = 0; idx < inputNum; idx++) {
+                                    apiHandler.cleanupStt(idx);
+                                  }
+                                  
+
                                 } else {
                                   errorDialog(context,'범위내의 값을 입력하세요. (1~100)');
                                   
@@ -1061,7 +1062,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                     final displayTime =
                                         StopWatchTimer.getDisplayTime(value,
                                             hours: false);
-                                    lastNoiseRunningTime = value;
+                                    lastEqualizeEvaluationTime = value;
                                     return Column(
                                       children: <Widget>[
                                         Padding(
@@ -1108,7 +1109,7 @@ class _MyHomePageState extends State<MyHomePage> {
                               );
                             },
                             child:
-                                Text('Run Equalize  < $lastNoiseRunningTime ms >'),
+                                Text('Run Equalize  < $lastEqualizeEvaluationTime ms >'),
                           )),
                     ),
                   ],

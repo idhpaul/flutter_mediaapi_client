@@ -16,8 +16,6 @@ import 'package:schedulers/schedulers.dart';
 import 'package:http/http.dart';
 
 
-final task = <Future>[];
-
 enum APIReturnType {
   ERROR,
 
@@ -150,10 +148,10 @@ class APIHandler{
   late DolbyAPIManager _apiManager;
   final intervalScheduler = IntervalScheduler(delay: const Duration(seconds: 1));
 
+  final task = <Future<bool>>[];
+
   bool hasToken = false;
-
   
-
   APIHandler(){
 
     _apiPreferences.init();
@@ -213,27 +211,6 @@ class APIHandler{
     _apiManager._getToken();
   }
 
-  void getTokenState() {
-    var ret = _checkVerifyToken();
-
-    switch (ret) {
-      case APIReturnType.TOKEN_NONE:
-        _publishToken();
-        break;
-      case APIReturnType.TOKEN_EXPIRE:
-        _publishToken();
-        break;
-      case APIReturnType.TOKEN_VERIFY:
-        break;
-      case APIReturnType.ERROR:
-        // TODO: Handle this case.
-        break;
-      case APIReturnType.OK:
-        // TODO: Handle this case.
-        break;
-    }
-
-  }
 
   Future<String> createPreSignEnhance(int inputNum) async {
     return _apiManager._createPreSignEnhance(inputNum);
@@ -251,28 +228,40 @@ class APIHandler{
     return _apiManager._getAnalyzeJson(idx);
   }
 
+  Future<bool> job(int idx) async {
+    await Future.delayed(const Duration(seconds : 5),() {
+      print("[$idx]Job done(wait 5 second)");
+    });
+
+    return true;
+  }
+
   void startEnhancing(int idx, String urlsJson){
-    task.clear();
     task.add(_apiManager._startEnhancing(idx, urlsJson));
   }
 
   Future<int> waitEnhancing() async {
     
-    await Future.wait(task);
+    var result = await Future.wait(task);
+    print(result);
+
+    task.clear();
 
     return 1;
     
   }
 
   void startAnalyze(int idx, String urlsJson){
-    task.clear();
     task.add(_apiManager._startAnalyzing(idx, urlsJson, isOriginal:true));
     task.add(_apiManager._startAnalyzing(idx, urlsJson));
   }
 
   Future<int> waitEnhancingEvaluation() async {
 
-    await Future.wait(task);
+    var result = await Future.wait(task);
+    print(result);
+
+    task.clear();
 
     return 1;
   }
@@ -282,15 +271,34 @@ class APIHandler{
   }
 
   void startEqualize(int idx, String urlsJson){
-    task.clear();
     task.add(_apiManager._startEqualizing(idx, urlsJson));
   }
 
   Future<int> waitEqualize() async {
 
-    await Future.wait(task);
+    var result = await Future.wait(task);
+    print(result);
+
+    task.clear();
 
     return 1;
+  }
+
+  void startStt(int idx){
+    task.add(_apiManager._startStt(idx));
+  }
+
+  Future<int> waitStt() async {
+
+    await Future.wait(task);
+
+    task.clear();
+
+    return 1;
+  }
+
+  void cleanupStt(int idx){
+    _apiManager._cleanupStt(idx);
   }
 
   void saveData(){
@@ -374,7 +382,7 @@ class DolbyAPIManager{
 
       if (response.statusCode != 200)throw HttpException('${response.statusCode} / ${response.body}');
 
-      logger.i("${response.statusCode} / ${response.body}");
+      //logger.i("${response.statusCode} / ${response.body}");
 
     } on SocketException {
       String errMsg = "No Internet connection 😑";
@@ -408,7 +416,7 @@ class DolbyAPIManager{
 
       if (response.statusCode != 200) throw HttpException('${response.statusCode} / ${response.body}');
 
-      logger.i("${response.statusCode} / ${response.body}");
+      //logger.i("${response.statusCode} / ${response.body}");
 
     } on SocketException {
       String errMsg = "No Internet connection 😑";
@@ -442,7 +450,7 @@ class DolbyAPIManager{
 
       if (response.statusCode != 200) throw HttpException('${response.statusCode} / ${response.body}');
 
-      logger.i("${response.statusCode} / ${response.body}");
+      //logger.i("${response.statusCode} / ${response.body}");
 
     } on SocketException {
       String errMsg = "No Internet connection 😑";
@@ -476,7 +484,7 @@ class DolbyAPIManager{
 
       if (response.statusCode != 200) throw HttpException('${response.statusCode} / ${response.body}');
 
-      logger.i("${response.statusCode} / ${response.body}");
+      //logger.i("${response.statusCode} / ${response.body}");
 
     } on SocketException {
       String errMsg = "No Internet connection 😑";
@@ -491,8 +499,9 @@ class DolbyAPIManager{
     return response.body;
   }
 
-  Future<void> _startEnhancing(int idx, String urlsJson) async {
+  Future<bool> _startEnhancing(int idx, String urlsJson) async {
 
+    bool returnValue = false;
     String basicAuth = "Bearer ${_apiPreferences.read<String>('access_token')}";
     //print(basicAuth);
 
@@ -519,7 +528,7 @@ class DolbyAPIManager{
 
       if (response.statusCode != 200)throw HttpException('${response.statusCode} / ${response.body}');
 
-      logger.i("${response.statusCode} / ${response.body}");
+      //logger.i("${response.statusCode} / ${response.body}");
       logger.i("$idx - Enhancing Start");
 
       //var selidx1 = "A${idx+4}";
@@ -533,10 +542,8 @@ class DolbyAPIManager{
 
 
       bool isRun = true;
-      while (isRun) {
-       
-        var res = _checkEnhancingStatus(idx);
-        res.then((val) {
+      do {
+        await _checkEnhancingStatus(idx).then((val) {
           var decodedUrlJson = jsonDecode(val);
           print(decodedUrlJson['status']);
 
@@ -548,6 +555,7 @@ class DolbyAPIManager{
 
             //timer.cancel();
             isRun = false;
+            returnValue = true;
           }
           else{
             
@@ -557,8 +565,8 @@ class DolbyAPIManager{
         });
 
         await Future.delayed(const Duration(milliseconds : MEDIA_API_TIMER_PERIODIC_MS));
+      } while (isRun);
 
-      }
 
 
       // Timer.periodic(
@@ -599,11 +607,9 @@ class DolbyAPIManager{
       String errMsg = "Couldn't find the post 😱 ${e}";
       logger.e(errMsg);
       throw HttpException(errMsg);
-    }
+    } 
 
-
-    //String doingMsg = "Run Done ${idx}";
-    //logger.v(doingMsg);
+    return returnValue;
   }
 
   Future<String> _checkEnhancingStatus(int idx) async {
@@ -622,7 +628,7 @@ class DolbyAPIManager{
 
       if (response.statusCode != 200)throw HttpException('${response.statusCode} / ${response.body}');
 
-      logger.i("${response.statusCode} / ${response.body}");
+      //logger.i("${response.statusCode} / ${response.body}");
 
     } on SocketException {
       String errMsg = "No Internet connection 😑";
@@ -637,8 +643,9 @@ class DolbyAPIManager{
     return response.body;
   }
 
-  Future<void> _startAnalyzing(int idx, String urlsJson, {bool isOriginal = false} ) async {
+  Future<bool> _startAnalyzing(int idx, String urlsJson, {bool isOriginal = false} ) async {
 
+    bool returnValue = false;
     String basicAuth = "Bearer ${_apiPreferences.read<String>('access_token')}";
     //print(basicAuth);
 
@@ -672,7 +679,7 @@ class DolbyAPIManager{
 
       if (response.statusCode != 200)throw HttpException('${response.statusCode} / ${response.body}');
 
-      logger.i("${response.statusCode} / ${response.body}");
+      //logger.i("${response.statusCode} / ${response.body}");
       logger.i("$idx - Analyzing Start");
 
       // var selidx1 = "A${idx+4}";
@@ -687,24 +694,25 @@ class DolbyAPIManager{
       
       
       bool isRun = true;
-      while (isRun) {
+      do {
         var res = (isOriginal) ? _checkAnalyzeStatus(idx,isOriginal: true) : _checkAnalyzeStatus(idx);
-        res.then((val) {
+        res.then((val) async {
           var decodedUrlJson = jsonDecode(val);
           print(decodedUrlJson['status']);
 
           if(decodedUrlJson['status'] == 'Success'){
-            isRun = false;
             logger.i("$idx - Analyzing End");
 
             //var selidx1 = "C${idx+4}";
            // _apiPreferences.write_excel(selidx1,DateTime.now().toLocal().toString());
 
-            var jsonurl = _getAnalyzeJson(idx);
-            jsonurl.then((value) {
+            await _getAnalyzeJson(idx).then((value) {
               _compareAnalyzeData(idx, value);
               logger.i("$idx - Compare Analyzing End");
             });
+
+            isRun = false;
+            returnValue = true;
 
           }
           else{
@@ -714,7 +722,8 @@ class DolbyAPIManager{
         });
 
         await Future.delayed(const Duration(milliseconds : MEDIA_API_TIMER_PERIODIC_MS));
-      }
+      } while (isRun);
+      
     //   Timer.periodic(
     //   const Duration(milliseconds: TIMER_PERIODIC_MS), 
     //   (timer) {
@@ -759,6 +768,8 @@ class DolbyAPIManager{
       logger.e(errMsg);
       throw HttpException(errMsg);
     }
+
+    return returnValue;
   }
 
   Future<String> _checkAnalyzeStatus(int idx,{bool isOriginal = false}) async {
@@ -785,7 +796,7 @@ class DolbyAPIManager{
 
       if (response.statusCode != 200)throw HttpException('${response.statusCode} / ${response.body}');
 
-      logger.i("${response.statusCode} / ${response.body}");
+      //logger.i("${response.statusCode} / ${response.body}");
 
     } on SocketException {
       String errMsg = "No Internet connection 😑";
@@ -822,7 +833,7 @@ class DolbyAPIManager{
 
       if (response.statusCode != 200)throw HttpException('${response.statusCode} / ${response.body}');
 
-      logger.i("${response.statusCode} / Get Original Analyze Json Data");
+      //logger.i("${response.statusCode} / Get Original Analyze Json Data");
 
       var decodedResponse = jsonDecode(utf8.decode(response.bodyBytes)) as Map;
       originalAnalyzeNoiseAverage = decodedResponse['processed_region']['audio']['noise']['level_average'];
@@ -875,8 +886,9 @@ class DolbyAPIManager{
 
   }
 
-  Future<void> _startEqualizing(int idx, String urlsJson, {bool isOriginal = false} ) async {
+  Future<bool> _startEqualizing(int idx, String urlsJson, {bool isOriginal = false} ) async {
 
+    bool returnValue = false;
     String basicAuth = "Bearer ${_apiPreferences.read<String>('access_token')}";
     //print(basicAuth);
 
@@ -929,7 +941,7 @@ class DolbyAPIManager{
 
       if (response.statusCode != 200)throw HttpException('${response.statusCode} / ${response.body}');
 
-      logger.i("${response.statusCode} / ${response.body}");
+      //logger.i("${response.statusCode} / ${response.body}");
       logger.i("$idx - Equalizing Start");
 
       // var selidx1 = "A${idx+4}";
@@ -944,28 +956,30 @@ class DolbyAPIManager{
       
       
       bool isRun = true;
-      while (isRun) {
+      do {
         var res = (isOriginal) ? _checkEqualizeStatus(idx,isOriginal: true) : _checkEqualizeStatus(idx);
         res.then((val) {
           var decodedUrlJson = jsonDecode(val);
           print(decodedUrlJson['status']);
 
           if(decodedUrlJson['status'] == 'Success'){
-            isRun = false;
             logger.i("$idx - Equalizing End");
 
             //var selidx1 = "C${idx+4}";
             //_apiPreferences.write_excel(selidx1,DateTime.now().toLocal().toString());
 
+            isRun = false;
+            returnValue = true;
           }
           else{
-            String doingMsg = "Running ${idx} : ${decodedUrlJson['progress']}";
-            logger.e(doingMsg);
+            //String doingMsg = "Running ${idx} : ${decodedUrlJson['progress']}";
+            //logger.e(doingMsg);
           }
         });
 
         await Future.delayed(const Duration(milliseconds : MEDIA_API_TIMER_PERIODIC_MS));
-      }
+      } while (isRun);
+
     //   Timer.periodic(
     //   const Duration(milliseconds: TIMER_PERIODIC_MS), 
     //   (timer) {
@@ -1004,6 +1018,8 @@ class DolbyAPIManager{
       logger.e(errMsg);
       throw HttpException(errMsg);
     }
+
+    return returnValue;
   }
 
   Future<String> _checkEqualizeStatus(int idx,{bool isOriginal = false}) async {
@@ -1030,7 +1046,125 @@ class DolbyAPIManager{
 
       if (response.statusCode != 200)throw HttpException('${response.statusCode} / ${response.body}');
 
-      logger.i("${response.statusCode} / ${response.body}");
+      //logger.i("${response.statusCode} / ${response.body}");
+
+    } on SocketException {
+      String errMsg = "No Internet connection 😑";
+      logger.e(errMsg);
+      throw SocketException(errMsg);
+    } on HttpException catch (e) {
+      String errMsg = "Couldn't find the post 😱 ${e}";
+      logger.e(errMsg);
+      throw HttpException(errMsg);
+    }
+
+    return response.body;
+  }
+
+  Future<bool> _startStt(int idx) async {
+
+    bool returnValue = false;
+
+    Uri uri = Uri.parse("http://localhost:8080/startStt");
+    Map<String, String> header = {
+      'content-type': "application/json",
+    };
+    Map<String, dynamic> data = {
+      "index": idx,
+    };
+
+    try {
+
+      final response = await post(uri, headers: header ,body:jsonEncode(data));
+
+      if (response.
+      statusCode != 200)throw HttpException('${response.statusCode} / ${response.body}');
+
+      //logger.i("${response.statusCode} / ${response.body}");
+      logger.i("$idx - Stt Start");
+
+      bool isRun = true;
+      do {
+        await _checkSttStatus(idx).then((val) {
+          var decodedUrlJson = jsonDecode(val);
+
+          if(decodedUrlJson['result'] == 'COMPLETED'){
+            logger.i("$idx - Stt End");
+
+            isRun = false;
+            returnValue = true;
+          }
+        });
+
+        await Future.delayed(const Duration(milliseconds : MEDIA_API_WAIT_STT_PERIODIC_MS));
+
+      } while (isRun);
+
+
+      
+    } on SocketException {
+      String errMsg = "No Internet connection 😑";
+      logger.e(errMsg);
+      throw SocketException(errMsg);
+    } on HttpException catch (e) {
+      String errMsg = "Couldn't find the post 😱 ${e}";
+      logger.e(errMsg);
+      throw HttpException(errMsg);
+    }
+
+    return returnValue;
+  }
+
+  Future<String> _checkSttStatus(int idx) async {
+
+    Uri uri = Uri.parse("http://localhost:8080/getStt");
+    Map<String, String> header = {
+      'content-type': "application/json",
+    };
+    Map<String, dynamic> data = {
+      "index": idx,
+    };
+
+    late Response response;
+
+    try {
+      response = await post(uri, headers: header, body:jsonEncode(data));
+
+      if (response.statusCode != 200)throw HttpException('${response.statusCode} / ${response.body}');
+
+      //logger.i("${response.statusCode} / ${response.body}");
+
+    } on SocketException {
+      String errMsg = "No Internet connection 😑";
+      logger.e(errMsg);
+      throw SocketException(errMsg);
+    } on HttpException catch (e) {
+      String errMsg = "Couldn't find the post 😱 ${e}";
+      logger.e(errMsg);
+      throw HttpException(errMsg);
+    }
+
+    return response.body;
+  }
+
+  Future<String> _cleanupStt(int idx) async {
+
+    Uri uri = Uri.parse("http://localhost:8080/cleanupStt");
+    Map<String, String> header = {
+      'content-type': "application/json",
+    };
+    Map<String, dynamic> data = {
+      "index": idx,
+    };
+
+    late Response response;
+
+    try {
+      response = await post(uri, headers: header, body:jsonEncode(data));
+
+      if (response.statusCode != 200)throw HttpException('${response.statusCode} / ${response.body}');
+
+      //logger.i("${response.statusCode} / ${response.body}");
 
     } on SocketException {
       String errMsg = "No Internet connection 😑";
