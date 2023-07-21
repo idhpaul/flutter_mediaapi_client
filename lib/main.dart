@@ -75,10 +75,12 @@ class _MyHomePageState extends State<MyHomePage> {
   final enhanceTextFieldController = TextEditingController();
   final analyzeTextFieldController = TextEditingController();
 
-  late int lastNoiseRunningTime;
-  late int lastNoiseEvaluationTime;
-  late int lastEqualizeRunningTime;
-  late int lastEqualizeEvaluationTime;
+  int lastNoiseRunningTime = 0;
+  int lastNoiseEvaluationTime = 0;
+  int lastEqualizeRunningTime = 0;
+  int lastEqualizeEvaluationTime = 0;
+  int lastVideoTranslateRunningTime = 0;
+  int prepareProcessInterval = 0;
 
   final StopWatchTimer _stopWatchTimer = StopWatchTimer(
     mode: StopWatchMode.countUp,
@@ -98,11 +100,6 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   void initState() {
     super.initState();
-
-    lastNoiseRunningTime = 0;
-    lastNoiseEvaluationTime = 0;
-    lastEqualizeRunningTime = 0;
-    lastEqualizeEvaluationTime = 0;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       stopwatch.stop();
@@ -138,34 +135,34 @@ class _MyHomePageState extends State<MyHomePage> {
             borderRadius: BorderRadius.zero,
           ),
           title: const Text(
-            "AppBar",
+            "과제 평가 프로그램",
             style: TextStyle(
               fontWeight: FontWeight.w400,
               fontStyle: FontStyle.normal,
               fontSize: 14,
-              color: Color(0xff000000),
+              color: Color.fromARGB(255, 255, 255, 255),
             ),
           ),
         ),
-        bottomNavigationBar: BottomNavigationBar(
-          items: bottomNavigationBarItems.map((BottomNavigationBarModel item) {
-            return BottomNavigationBarItem(
-              icon: Icon(item.icon),
-              label: item.label,
-            );
-          }).toList(),
-          backgroundColor: const Color(0xffffffff),
-          currentIndex: 0,
-          elevation: 8,
-          iconSize: 24,
-          selectedItemColor: const Color(0xff3a57e8),
-          unselectedItemColor: const Color(0xff9e9e9e),
-          selectedFontSize: 14,
-          unselectedFontSize: 14,
-          showSelectedLabels: true,
-          showUnselectedLabels: true,
-          onTap: (value) {},
-        ),
+        // bottomNavigationBar: BottomNavigationBar(
+        //   items: bottomNavigationBarItems.map((BottomNavigationBarModel item) {
+        //     return BottomNavigationBarItem(
+        //       icon: Icon(item.icon),
+        //       label: item.label,
+        //     );
+        //   }).toList(),
+        //   backgroundColor: const Color(0xffffffff),
+        //   currentIndex: 0,
+        //   elevation: 8,
+        //   iconSize: 24,
+        //   selectedItemColor: const Color(0xff3a57e8),
+        //   unselectedItemColor: const Color(0xff9e9e9e),
+        //   selectedFontSize: 14,
+        //   unselectedFontSize: 14,
+        //   showSelectedLabels: true,
+        //   showUnselectedLabels: true,
+        //   onTap: (value) {},
+        // ),
         body: SafeArea(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.start,
@@ -195,24 +192,13 @@ class _MyHomePageState extends State<MyHomePage> {
                     indent: 0,
                     endIndent: 0,
                   ),
-                  const Text(
-                    "토큰 상태",
-                    textAlign: TextAlign.start,
-                    overflow: TextOverflow.clip,
-                    style: TextStyle(
-                      fontWeight: FontWeight.w400,
-                      fontStyle: FontStyle.normal,
-                      fontSize: 14,
-                      color: Color(0xff000000),
-                    ),
-                  ),
                   const TokenCondition(),
                 ],
               ),
               const Divider(
                 color: Color(0xff808080),
-                height: 16,
-                thickness: 0,
+                height: 20,
+                thickness: 1,
                 indent: 0,
                 endIndent: 0,
               ),
@@ -303,7 +289,7 @@ class _MyHomePageState extends State<MyHomePage> {
                       ),
                     ),
                     Expanded(
-                      flex: 2,
+                      flex: 3,
                       child: Padding(
                           padding: const EdgeInsets.fromLTRB(0, 0, 0, 0),
                           child: AsyncButtonBuilder(
@@ -315,7 +301,7 @@ class _MyHomePageState extends State<MyHomePage> {
                               } else {
                                 int inputNum = int.parse(enhanceTextFieldController.text);
 
-                                lastNoiseRunningTime = 0;
+                                //lastNoiseRunningTime = 0;
                                 _stopWatchTimer.onStartTimer();
 
                                 if (0 < inputNum && inputNum <= MAIN_TEXTCONTROLLER_SAMPLE_COUNT) {
@@ -343,12 +329,14 @@ class _MyHomePageState extends State<MyHomePage> {
                                   await apiHandler.waitEnhancing().then((value){
                                     
                                     print("Enhancing is finished");
-
-                                    setState(() {
-                                      _stopWatchTimer.onStopTimer();
-                                      _stopWatchTimer.onResetTimer();
-                                    });
                                   });
+
+                                  setState(() {
+                                      lastNoiseRunningTime = _stopWatchTimer.rawTime.value;
+                                    });
+
+                                  _stopWatchTimer.onStopTimer();
+                                  _stopWatchTimer.onResetTimer();
 
                                   // // #2 wait job is done and stop timer
                                   // await Future.delayed(const Duration(seconds: 30), () {
@@ -365,10 +353,10 @@ class _MyHomePageState extends State<MyHomePage> {
                               }
                             },
                             onError: () {
-                              setState(() {
+                              //setState(() {
                                       _stopWatchTimer.onStopTimer();
                                       _stopWatchTimer.onResetTimer();
-                                    });
+                              //      });
                             },
                             loadingWidget: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
@@ -393,7 +381,6 @@ class _MyHomePageState extends State<MyHomePage> {
                                     final displayTime =
                                         StopWatchTimer.getDisplayTime(value,
                                             hours: false);
-                                    lastNoiseRunningTime = value;
                                     return Column(
                                       children: <Widget>[
                                         Padding(
@@ -533,7 +520,7 @@ class _MyHomePageState extends State<MyHomePage> {
                       ),
                     ),
                     Expanded(
-                      flex: 2,
+                      flex: 3,
                       child: Padding(
                           padding: const EdgeInsets.fromLTRB(0, 0, 0, 0),
                           child: AsyncButtonBuilder(
@@ -546,7 +533,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                 int inputNum =
                                     int.parse(enhanceTextFieldController.text);
 
-                                lastNoiseEvaluationTime = 0;
+                                //lastNoiseEvaluationTime = 0;
                                 _stopWatchTimer.onStartTimer();
 
                                 if (0 < inputNum && inputNum <= MAIN_TEXTCONTROLLER_SAMPLE_COUNT) {
@@ -580,12 +567,14 @@ class _MyHomePageState extends State<MyHomePage> {
                                         throw 'error';
                                       });
                                     }
-
-                                    setState(() {
-                                      _stopWatchTimer.onStopTimer();
-                                      _stopWatchTimer.onResetTimer();
-                                    });
                                   });
+
+                                  setState(() {
+                                      lastNoiseEvaluationTime =_stopWatchTimer.rawTime.value;
+                                    });
+
+                                    _stopWatchTimer.onStopTimer();
+                                    _stopWatchTimer.onResetTimer();
 
                                 } else {
 
@@ -596,10 +585,10 @@ class _MyHomePageState extends State<MyHomePage> {
                               }
                             },
                             onError: () {
-                              setState(() {
+                              //setState(() {
                                       _stopWatchTimer.onStopTimer();
                                       _stopWatchTimer.onResetTimer();
-                                    });
+                              //      });
                             },
                             loadingWidget: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
@@ -624,7 +613,6 @@ class _MyHomePageState extends State<MyHomePage> {
                                     final displayTime =
                                         StopWatchTimer.getDisplayTime(value,
                                             hours: false);
-                                    lastNoiseEvaluationTime = value;
                                     return Column(
                                       children: <Widget>[
                                         Padding(
@@ -680,8 +668,8 @@ class _MyHomePageState extends State<MyHomePage> {
 
               const Divider(
                 color: Color(0xff808080),
-                height: 16,
-                thickness: 0,
+                height: 20,
+                thickness: 1,
                 indent: 0,
                 endIndent: 0,
               ),
@@ -772,7 +760,7 @@ class _MyHomePageState extends State<MyHomePage> {
                       ),
                     ),
                     Expanded(
-                      flex: 2,
+                      flex: 3,
                       child: Padding(
                           padding: const EdgeInsets.fromLTRB(0, 0, 0, 0),
                           child: AsyncButtonBuilder(
@@ -785,7 +773,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                 int inputNum =
                                     int.parse(enhanceTextFieldController.text);
 
-                                lastEqualizeRunningTime = 0;
+                                //lastEqualizeRunningTime = 0;
                                 _stopWatchTimer.onStartTimer();
 
                                 if (0 < inputNum && inputNum <= MAIN_TEXTCONTROLLER_SAMPLE_COUNT) {
@@ -810,11 +798,13 @@ class _MyHomePageState extends State<MyHomePage> {
                                   // #2 wait job is done and stop timer
                                   await apiHandler.waitEqualize().then((value){
 
+                                  });
+
                                     setState(() {
+                                      lastEqualizeRunningTime = _stopWatchTimer.rawTime.value;
+                                    });
                                       _stopWatchTimer.onStopTimer();
                                       _stopWatchTimer.onResetTimer();
-                                    });
-                                  });
                                 } else {
 
                                   errorDialog(context,'범위내의 값을 입력하세요. (1~100)');
@@ -822,6 +812,12 @@ class _MyHomePageState extends State<MyHomePage> {
                                   throw 'Out of Data range';
                                 }
                               }
+                            },
+                            onError: () {
+                              //setState(() {
+                                      _stopWatchTimer.onStopTimer();
+                                      _stopWatchTimer.onResetTimer();
+                              //      });
                             },
                             loadingWidget: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
@@ -846,7 +842,6 @@ class _MyHomePageState extends State<MyHomePage> {
                                     final displayTime =
                                         StopWatchTimer.getDisplayTime(value,
                                             hours: false);
-                                    lastEqualizeRunningTime = value;
                                     return Column(
                                       children: <Widget>[
                                         Padding(
@@ -900,7 +895,7 @@ class _MyHomePageState extends State<MyHomePage> {
                 ),
               ),
 
-              // 이퀄라이징 평가
+              // 이퀄라이징 평가 
               Container(
                 margin: const EdgeInsets.all(0),
                 padding: const EdgeInsets.all(10),
@@ -925,8 +920,8 @@ class _MyHomePageState extends State<MyHomePage> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisSize: MainAxisSize.max,
                           children: [
-                            const Text(
-                              "이퀄라이징 평가",
+                            Text(
+                              "이퀄라이징 평가 시간",
                               textAlign: TextAlign.start,
                               overflow: TextOverflow.clip,
                               style: TextStyle(
@@ -986,7 +981,7 @@ class _MyHomePageState extends State<MyHomePage> {
                       ),
                     ),
                     Expanded(
-                      flex: 2,
+                      flex: 3,
                       child: Padding(
                           padding: const EdgeInsets.fromLTRB(0, 0, 0, 0),
                           child: AsyncButtonBuilder(
@@ -1007,25 +1002,43 @@ class _MyHomePageState extends State<MyHomePage> {
 
                                   // #1 request job
                                   for (var idx = 0; idx < inputNum; idx++) {
-                                    apiHandler.startStt(idx);
+                                    apiHandler.startStt(idx, false);
                                   }
 
-                                  // #2 wait job is done and stop timer
+                                  // #2 wait job is done\
                                   await apiHandler.waitStt().then((value){
                                     
                                     print("Stt is finished");
 
-                                    setState(() {
-                                      _stopWatchTimer.onStopTimer();
-                                      _stopWatchTimer.onResetTimer();
-                                    });
+                                  });
+
+                                  await apiHandler.cleanupStt(inputNum,false).then((value){
+                                    print("Stt cleanup is finished");
+                                  });
+
+                                  // #3 request original job
+                                  for (var idx = 0; idx < inputNum; idx++) {
+                                    apiHandler.startStt(idx, true);
+                                  }
+
+                                  // #5 wait original job is done\
+                                  await apiHandler.waitStt().then((value){
+                                    
+                                    print("Stt is finished");
+
+                                    
+                                  });
+
+                                  await apiHandler.cleanupStt(inputNum,true).then((value){
+                                    print("Stt original cleanup is finished");
                                   });
                                   
-                                  for (var idx = 0; idx < inputNum; idx++) {
-                                    apiHandler.cleanupStt(idx);
-                                  }
-                                  
+                                  setState(() {
+                                    lastEqualizeEvaluationTime  = _stopWatchTimer.rawTime.value;
+                                   });
 
+                                      _stopWatchTimer.onStopTimer();
+                                      _stopWatchTimer.onResetTimer();
                                 } else {
                                   errorDialog(context,'범위내의 값을 입력하세요. (1~100)');
                                   
@@ -1034,10 +1047,10 @@ class _MyHomePageState extends State<MyHomePage> {
                               }
                             },
                             onError: () {
-                              setState(() {
+                              //setState(() {
                                       _stopWatchTimer.onStopTimer();
                                       _stopWatchTimer.onResetTimer();
-                                    });
+                              //      });
                             },
                             loadingWidget: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
@@ -1062,7 +1075,6 @@ class _MyHomePageState extends State<MyHomePage> {
                                     final displayTime =
                                         StopWatchTimer.getDisplayTime(value,
                                             hours: false);
-                                    lastEqualizeEvaluationTime = value;
                                     return Column(
                                       children: <Widget>[
                                         Padding(
@@ -1114,6 +1126,393 @@ class _MyHomePageState extends State<MyHomePage> {
                     ),
                   ],
                 ),
+              ),
+
+              const Divider(
+                color: Color(0xff808080),
+                height: 20,
+                thickness: 1,
+                indent: 0,
+                endIndent: 0,
+              ),
+
+              // 이퀄라이징 처리
+              Container(
+                margin: const EdgeInsets.all(0),
+                padding: const EdgeInsets.all(10),
+                width: MediaQuery.of(context).size.width,
+                decoration: BoxDecoration(
+                  color: const Color(0x1f000000),
+                  shape: BoxShape.rectangle,
+                  borderRadius: BorderRadius.circular(10.0),
+                  border: Border.all(color: const Color(0x4d9e9e9e), width: 1),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.max,
+                  children: [
+                    Expanded(
+                      flex: 3,
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(0, 0, 5, 0),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.start,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.max,
+                          children: [
+                            const Text(
+                              "자동 번역 처리 시간",
+                              textAlign: TextAlign.start,
+                              overflow: TextOverflow.clip,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w400,
+                                fontStyle: FontStyle.normal,
+                                fontSize: 20,
+                                color: Color(0xff000000),
+                              ),
+                            ),
+                            TextField(
+                              controller: enhanceTextFieldController,
+                              obscureText: false,
+                              textAlign: TextAlign.left,
+                              maxLines: 1,
+                              keyboardType: TextInputType.number,
+                              inputFormatters: <TextInputFormatter>[
+                                FilteringTextInputFormatter.digitsOnly
+                              ],
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w400,
+                                fontStyle: FontStyle.normal,
+                                fontSize: 14,
+                                color: Color(0xff000000),
+                              ),
+                              decoration: InputDecoration(
+                                disabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(4.0),
+                                  borderSide: const BorderSide(
+                                      color: Color(0xff000000), width: 1),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(4.0),
+                                  borderSide: const BorderSide(
+                                      color: Color(0xff000000), width: 1),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(4.0),
+                                  borderSide: const BorderSide(
+                                      color: Color(0xff000000), width: 1),
+                                ),
+                                hintText: "시료 수 입력(1~100)",
+                                hintStyle: const TextStyle(
+                                  fontWeight: FontWeight.w400,
+                                  fontStyle: FontStyle.normal,
+                                  fontSize: 14,
+                                  color: Color(0xff000000),
+                                ),
+                                filled: true,
+                                fillColor: const Color(0xfff2f2f3),
+                                isDense: true,
+                                contentPadding: const EdgeInsets.symmetric(
+                                    vertical: 8, horizontal: 12),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      flex: 3,
+                      child: Padding(
+                          padding: const EdgeInsets.fromLTRB(0, 0, 0, 0),
+                          child: AsyncButtonBuilder(
+                            onPressed: () async {
+                              if (enhanceTextFieldController.text.isEmpty) {
+                                errorDialog(context,'값을 입력하세요');
+                                
+                                throw 'Data empty';
+                              } else {
+                                int inputNum =
+                                    int.parse(enhanceTextFieldController.text);
+
+                                //lastEqualizeRunningTime = 0;
+                                _stopWatchTimer.onStartTimer();
+
+                                if (0 < inputNum && inputNum <= MAIN_TEXTCONTROLLER_SAMPLE_COUNT) {
+                                  print('자동 번역 시작');
+
+                                  // #1 request job
+                                  for (var idx = 0; idx < inputNum; idx++) {
+                                    apiHandler.startVideoStt(idx);
+                                  }
+                                  
+
+                                  // #2 wait job is done and stop timer
+                                  await apiHandler.waitVideoStt().then((value){
+
+
+                                  });
+
+                                  await apiHandler.cleanupVideoStt(inputNum).then((value){
+                                    print("Video Stt original cleanup is finished");
+                                  });
+
+                                    setState(() {
+                                      lastVideoTranslateRunningTime = _stopWatchTimer.rawTime.value;
+                                    });
+
+                                    _stopWatchTimer.onStopTimer();
+                                    _stopWatchTimer.onResetTimer();
+
+                                } else {
+
+                                  errorDialog(context,'범위내의 값을 입력하세요. (1~100)');
+                                  
+                                  throw 'Out of Data range';
+                                }
+                              }
+                            },
+                            onError: () {
+
+                              _stopWatchTimer.onStopTimer();
+                              _stopWatchTimer.onResetTimer();
+
+                            },
+                            loadingWidget: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: <Widget>[
+                                const Padding(
+                                  padding: EdgeInsets.all(8.0),
+                                  child: SizedBox(
+                                    height: 16.0,
+                                    width: 16.0,
+                                    child: CircularProgressIndicator(
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                          Colors.white),
+                                    ),
+                                  ),
+                                ),
+                                StreamBuilder<int>(
+                                  stream: _stopWatchTimer.rawTime,
+                                  initialData: _stopWatchTimer.rawTime.value,
+                                  builder: (context, snap) {
+                                    final value = snap.data!;
+                                    final displayTime =
+                                        StopWatchTimer.getDisplayTime(value,
+                                            hours: false);
+                                    return Column(
+                                      children: <Widget>[
+                                        Padding(
+                                          padding: const EdgeInsets.all(4),
+                                          child: Text(
+                                            displayTime,
+                                            style: const TextStyle(
+                                                fontSize: 25,
+                                                fontFamily: 'Helvetica',
+                                                fontWeight: FontWeight.bold),
+                                          ),
+                                        ),
+                                        Padding(
+                                          padding: const EdgeInsets.all(4),
+                                          child: Text(
+                                            value.toString(),
+                                            style: const TextStyle(
+                                                fontSize: 15,
+                                                fontFamily: 'Helvetica',
+                                                fontWeight: FontWeight.w400),
+                                          ),
+                                        ),
+                                      ],
+                                    );
+                                  },
+                                ),
+                              ],
+                            ),
+                            builder: (context, child, callback, buttonState) {
+                              final buttonColor = buttonState.when(
+                                idle: () => Colors.blue,
+                                loading: () => Colors.green,
+                                success: () => Colors.orangeAccent,
+                                error: (_, __) => Colors.orange,
+                              );
+
+                              return OutlinedButton(
+                                onPressed: callback,
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: Colors.white,
+                                  backgroundColor: buttonColor,
+                                ),
+                                child: child,
+                              );
+                            },
+                            child: Text(
+                                'Run Video Translate  < $lastVideoTranslateRunningTime ms >'),
+                          )),
+                    ),
+                  ],
+                ),
+              ),
+
+              const Divider(
+                color: Color(0xff808080),
+                height: 25,
+                thickness: 1,
+                indent: 0,
+                endIndent: 0,
+              ),
+
+              // 사전 기능 처리 시간
+              Container(
+                margin: const EdgeInsets.all(0),
+                padding: const EdgeInsets.all(10),
+                width: MediaQuery.of(context).size.width,
+                decoration: BoxDecoration(
+                  color: const Color(0x1f000000),
+                  shape: BoxShape.rectangle,
+                  borderRadius: BorderRadius.circular(10.0),
+                  border: Border.all(color: const Color(0x4d9e9e9e), width: 1),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.max,
+                  children: [
+                    Expanded(
+                      flex: 3,
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(0, 0, 5, 0),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.start,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.max,
+                          children: const [
+                             Text(
+                              "사전 기능 처리 시간",
+                              textAlign: TextAlign.start,
+                              overflow: TextOverflow.clip,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w400,
+                                fontStyle: FontStyle.normal,
+                                fontSize: 20,
+                                color: Color(0xff000000),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      flex: 3,
+                      child: Padding(
+                          padding: const EdgeInsets.fromLTRB(0, 0, 0, 0),
+                          child: AsyncButtonBuilder(
+                            onPressed: () async {
+
+                              prepareProcessInterval = 0;
+                              _stopWatchTimer.onStartTimer();
+
+
+                              apiHandler.startPreProcess();
+
+                              await apiHandler.waitPreProcess().then((value){
+                                
+                                print("prepareProcess is finished");
+
+                              });
+ 
+                              setState(() {
+                                prepareProcessInterval  = _stopWatchTimer.rawTime.value;
+                              });
+
+                              _stopWatchTimer.onStopTimer();
+                              _stopWatchTimer.onResetTimer();
+                            },
+                            onError: () {
+                              _stopWatchTimer.onStopTimer();
+                              _stopWatchTimer.onResetTimer();
+                            },
+                            loadingWidget: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: <Widget>[
+                                const Padding(
+                                  padding: EdgeInsets.all(8.0),
+                                  child: SizedBox(
+                                    height: 16.0,
+                                    width: 16.0,
+                                    child: CircularProgressIndicator(
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                          Colors.white),
+                                    ),
+                                  ),
+                                ),
+                                StreamBuilder<int>(
+                                  stream: _stopWatchTimer.rawTime,
+                                  initialData: _stopWatchTimer.rawTime.value,
+                                  builder: (context, snap) {
+                                    final value = snap.data!;
+                                    final displayTime =
+                                        StopWatchTimer.getDisplayTime(value,hours: false);
+                                    return Column(
+                                      children: <Widget>[
+                                        Padding(
+                                          padding: const EdgeInsets.all(4),
+                                          child: Text(
+                                            displayTime,
+                                            style: const TextStyle(
+                                                fontSize: 25,
+                                                fontFamily: 'Helvetica',
+                                                fontWeight: FontWeight.bold),
+                                          ),
+                                        ),
+                                        Padding(
+                                          padding: const EdgeInsets.all(4),
+                                          child: Text(
+                                            value.toString(),
+                                            style: const TextStyle(
+                                                fontSize: 15,
+                                                fontFamily: 'Helvetica',
+                                                fontWeight: FontWeight.w400),
+                                          ),
+                                        ),
+                                      ],
+                                    );
+                                  },
+                                ),
+                              ],
+                            ),
+                            builder: (context, child, callback, buttonState) {
+                              final buttonColor = buttonState.when(
+                                idle: () => Colors.blue,
+                                loading: () => Colors.green,
+                                success: () => Colors.orangeAccent,
+                                error: (_, __) => Colors.orange,
+                              );
+
+                              return OutlinedButton(
+                                onPressed: callback,
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: Colors.white,
+                                  backgroundColor: buttonColor,
+                                ),
+                                child: child,
+                              );
+                            },
+                            child:
+                                Text('preProcess Time  < $prepareProcessInterval ms >'),
+                          )),
+                    ),
+                  ],
+                ),
+              ),
+
+              const Divider(
+                color: Color(0xff808080),
+                height: 20,
+                thickness: 1,
+                indent: 0,
+                endIndent: 0,
               ),
 
               OutlinedButton(

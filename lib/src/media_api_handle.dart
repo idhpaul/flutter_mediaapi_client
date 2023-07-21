@@ -4,6 +4,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:core';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_mediaapi_client/src/constant.dart';
@@ -37,8 +38,7 @@ class APIPreferences {
   void init() async {
     prefs = await SharedPreferences.getInstance();
 
-    var now = DateTime.now();
-    excelOutputFile = '/Users/idhpaul/Desktop/output_${now.month}.${now.day}_${now.hour}`${now.minute}.xlsx';
+    setExcelFileName();
 
     excelCreate();
   }
@@ -95,6 +95,15 @@ class APIPreferences {
     return returnValue;
   }
 
+  void setExcelFileName(){
+    var now = DateTime.now();
+    excelOutputFile = '${now.month}.${now.day}_${now.hour}`${now.minute}.xlsx';
+  }
+
+  String getExcelFileName(){
+    return excelOutputFile;
+  }
+
   void excelCreate(){
 
     sheet = excel['default'];
@@ -106,13 +115,14 @@ class APIPreferences {
     headCell1.value = "Index";
 
     var headCell2 = sheet.cell(CellIndex.indexByString("B3"));
-    headCell2.value = "Original Noise Evaluation";
+    headCell2.value = "Original snr Evaluation";
 
     var headCell3 = sheet.cell(CellIndex.indexByString("C3"));
-    headCell3.value = "Enhance Noise Evaluation";
+    headCell3.value = "Enhance snr Evaluation";
 
     var headCell4 = sheet.cell(CellIndex.indexByString("D3"));
-    headCell4.value = "Reduce Noise db";
+    headCell4.value = "Reduce snr";
+
   }
 
   void excelWriteCell(String cellIdx, dynamic data){
@@ -120,35 +130,34 @@ class APIPreferences {
     cell.value = data;
   }
 
-  void excelSave(){
+  List<int>? excelSave(){
    
     sheet.setColAutoFit(1);
     sheet.setColAutoFit(2);
     sheet.setColAutoFit(3);
     sheet.setColAutoFit(4);
 
+
     var now = DateTime.now();
     excel.rename('default','${now.month}.${now.day}_${now.hour}`${now.minute}');
 
-
-    List<int>? fileBytes = excel.save();
-    if (fileBytes != null) {
-      File(p.join(excelOutputFile))
-        ..createSync(recursive: true)
-        ..writeAsBytesSync(fileBytes);
+    
+    var fileBytes = excel.save();
+    if (fileBytes == null) {
+      logger.e("Excel file data is null");
     }
 
-    excelCreate();
+    return fileBytes;
   }
-
 }
 
 class APIHandler{
   final _apiPreferences = APIPreferences();
   late DolbyAPIManager _apiManager;
-  final intervalScheduler = IntervalScheduler(delay: const Duration(seconds: 1));
+  final periodScheduler = IntervalScheduler(delay: const Duration(seconds: 1));
 
   final task = <Future<bool>>[];
+  final cleanTask = <Future<String>>[];
 
   bool hasToken = false;
   
@@ -157,7 +166,7 @@ class APIHandler{
     _apiPreferences.init();
     _apiManager = DolbyAPIManager(_apiPreferences);
 
-    intervalScheduler.run((){
+    periodScheduler.run((){
       hasToken = (APIReturnType.TOKEN_VERIFY == _checkVerifyToken()) ? true : false;
 
     if (!hasToken) {
@@ -284,12 +293,12 @@ class APIHandler{
     return 1;
   }
 
-  void startStt(int idx){
-    task.add(_apiManager._startStt(idx));
+  void startStt(int idx, bool isOriginal){
+    task.add(_apiManager._startStt(idx, isOriginal));
   }
 
   Future<int> waitStt() async {
-
+    
     await Future.wait(task);
 
     task.clear();
@@ -297,14 +306,62 @@ class APIHandler{
     return 1;
   }
 
-  void cleanupStt(int idx){
-    _apiManager._cleanupStt(idx);
+  Future<int> cleanupStt(int count, bool isOriginal) async {
+    cleanTask.add(_apiManager._cleanupStt(count, isOriginal));
+
+    await Future.wait(cleanTask);
+
+    cleanTask.clear();
+
+    return 1;
   }
 
-  void saveData(){
-    // 시간 계산 : =TEXT(C4-B4,"mm:ss.000")
-    _apiPreferences.excelSave();
+  void startVideoStt(int idx){
+    task.add(_apiManager._startVideoStt(idx));
+  }
 
+  Future<int> waitVideoStt() async {
+    
+    await Future.wait(task);
+
+    task.clear();
+
+    return 1;
+  }
+
+  Future<int> cleanupVideoStt(int count) async {
+    cleanTask.add(_apiManager._cleanupVideoStt(count));
+
+    await Future.wait(cleanTask);
+
+    cleanTask.clear();
+
+    return 1;
+  }
+
+  void startPreProcess(){
+    task.add(_apiManager._startPreProcess());
+  }
+
+  Future<int> waitPreProcess() async {
+    
+    await Future.wait(task);
+
+    task.clear();
+
+    return 1;
+  }
+
+  void saveData() {
+
+    _apiPreferences.setExcelFileName();
+
+    // 시간 계산 : =TEXT(C4-B4,"mm:ss.000")
+    _apiManager._uploadExcel(_apiPreferences.getExcelFileName(), _apiPreferences.excelSave()); 
+
+    Future.delayed(const Duration(seconds: 30),(){
+      _apiPreferences.excelCreate();
+    });
   }
 
 
@@ -366,7 +423,7 @@ class DolbyAPIManager{
 
   Future<String> _createPreSignEnhance(int inputNum) async {
 
-    Uri uri = Uri.parse("http://localhost:8080/presignEnhance");
+    Uri uri = Uri.parse("http://${dotenv.env['GoIPAddress']}:8080/presignEnhance");
     Map<String, String> header = {
       'content-type': "application/json",
     };
@@ -399,7 +456,7 @@ class DolbyAPIManager{
 
   Future<String> _createPreSignAnalyze(int inputNum, {int retryCount = 0}) async {
 
-    Uri uri = Uri.parse("http://localhost:8080/presignAnalyze");
+    Uri uri = Uri.parse("http://${dotenv.env['GoIPAddress']}:8080/presignAnalyze");
     Map<String, String> header = {
       'content-type': "application/json",
     };
@@ -433,7 +490,7 @@ class DolbyAPIManager{
 
   Future<String> _createPreSignEqualize(int inputNum, {int retryCount = 0}) async {
 
-    Uri uri = Uri.parse("http://localhost:8080/presignEqualize");
+    Uri uri = Uri.parse("http://${dotenv.env['GoIPAddress']}:8080/presignEqualize");
     Map<String, String> header = {
       'content-type': "application/json",
     };
@@ -465,15 +522,14 @@ class DolbyAPIManager{
     return response.body;
   }
 
-  Future<String> _getAnalyzeJson(int idx, {int retryCount = 0}) async {
+  Future<String> _getAnalyzeJson(int idx) async {
 
-    Uri uri = Uri.parse("http://localhost:8080/getAnalyzeJson");
+    Uri uri = Uri.parse("http://${dotenv.env['GoIPAddress']}:8080/getAnalyzeJson");
     Map<String, String> header = {
       'content-type': "application/json",
     };
     Map<String, dynamic> data = {
       "index": idx,
-      "retry": retryCount
     };
 
     late Response response;
@@ -484,7 +540,7 @@ class DolbyAPIManager{
 
       if (response.statusCode != 200) throw HttpException('${response.statusCode} / ${response.body}');
 
-      //logger.i("${response.statusCode} / ${response.body}");
+      logger.i("${response.statusCode} / ${response.body}");
 
     } on SocketException {
       String errMsg = "No Internet connection 😑";
@@ -515,8 +571,11 @@ class DolbyAPIManager{
       'content-type': "application/json",
     };
     Map<String, dynamic> data = {
-      "audio": {"noise": {"reduction": {"enable": true}}},
-      "content":{"type": "voice_over"},
+
+      // amount value : auto(default), max, high, medium, low
+      "audio": {"noise": {"reduction": {"enable": true, "amount":"max"}}},
+      "content":{"type": "mobile_phone"},
+
       "input": decodedUrlJson['urls'][idx]['input'],
       "output": decodedUrlJson['urls'][idx]['output']
     };
@@ -564,7 +623,7 @@ class DolbyAPIManager{
           }
         });
 
-        await Future.delayed(const Duration(milliseconds : MEDIA_API_TIMER_PERIODIC_MS));
+        await Future.delayed(const Duration(milliseconds : MEDIA_API_WAIT_DURATION_MS));
       } while (isRun);
 
 
@@ -662,12 +721,10 @@ class DolbyAPIManager{
     Map<String, dynamic> data = 
     (isOriginal) 
     ? {
-        "content":{"silence":{"threshold":-60,"duration":2}},
         "input": decodedUrlJson['urljsons'][idx]['originalurl'],
         "output": decodedUrlJson['urljsons'][idx]['originalouputjson']
       }
     : {
-        "content":{"silence":{"threshold":-60,"duration":2}},
         "input": decodedUrlJson['urljsons'][idx]['inputurl'],
         "output": decodedUrlJson['urljsons'][idx]['outputjson']
     };
@@ -682,34 +739,19 @@ class DolbyAPIManager{
       //logger.i("${response.statusCode} / ${response.body}");
       logger.i("$idx - Analyzing Start");
 
-      // var selidx1 = "A${idx+4}";
-      // _apiPreferences.write_excel(selidx1,idx+1);
-      // var selidx2 = "B${idx+4}";
-
-      // _apiPreferences.write_excel(selidx2,DateTime.now().toLocal().toString());
-
       var decodedResponse = jsonDecode(utf8.decode(response.bodyBytes)) as Map;
       (isOriginal) ? _apiPreferences.write('analyze_original_job_id_$idx', decodedResponse['job_id']) 
                     : _apiPreferences.write('analyze_job_id_$idx', decodedResponse['job_id']);
       
-      
       bool isRun = true;
       do {
-        var res = (isOriginal) ? _checkAnalyzeStatus(idx,isOriginal: true) : _checkAnalyzeStatus(idx);
+        var res = (isOriginal) ? _checkAnalyzeStatus(idx,true) : _checkAnalyzeStatus(idx,false);
         res.then((val) async {
           var decodedUrlJson = jsonDecode(val);
           print(decodedUrlJson['status']);
 
           if(decodedUrlJson['status'] == 'Success'){
             logger.i("$idx - Analyzing End");
-
-            //var selidx1 = "C${idx+4}";
-           // _apiPreferences.write_excel(selidx1,DateTime.now().toLocal().toString());
-
-            await _getAnalyzeJson(idx).then((value) {
-              _compareAnalyzeData(idx, value);
-              logger.i("$idx - Compare Analyzing End");
-            });
 
             isRun = false;
             returnValue = true;
@@ -721,7 +763,7 @@ class DolbyAPIManager{
           }
         });
 
-        await Future.delayed(const Duration(milliseconds : MEDIA_API_TIMER_PERIODIC_MS));
+        await Future.delayed(const Duration(milliseconds : MEDIA_API_WAIT_DURATION_MS));
       } while (isRun);
       
     //   Timer.periodic(
@@ -772,7 +814,7 @@ class DolbyAPIManager{
     return returnValue;
   }
 
-  Future<String> _checkAnalyzeStatus(int idx,{bool isOriginal = false}) async {
+  Future<String> _checkAnalyzeStatus(int idx,bool isOriginal) async {
 
     Uri uri;
     if(isOriginal){
@@ -823,8 +865,8 @@ class DolbyAPIManager{
       'content-type': "application/json",
     };
 
-    double originalAnalyzeNoiseAverage;
-    double analyzeNoiseAverage;
+    double originalAnalyzeSNRAverage;
+    double analyzeSNRAverage;
     
     try {
 
@@ -836,12 +878,17 @@ class DolbyAPIManager{
       //logger.i("${response.statusCode} / Get Original Analyze Json Data");
 
       var decodedResponse = jsonDecode(utf8.decode(response.bodyBytes)) as Map;
-      originalAnalyzeNoiseAverage = decodedResponse['processed_region']['audio']['noise']['level_average'];
+      originalAnalyzeSNRAverage = decodedResponse['processed_region']['audio']['noise']['snr_average'];
 
       var cellIdx = "A${idx+4}";
       _apiPreferences.excelWriteCell(cellIdx,idx+1);
-      var cellOriginalEvaluation = "B${idx+4}";
-      _apiPreferences.excelWriteCell(cellOriginalEvaluation,originalAnalyzeNoiseAverage.abs());
+
+      var cellOriginalSNREvaluation = "B${idx+4}";
+      _apiPreferences.excelWriteCell(cellOriginalSNREvaluation,originalAnalyzeSNRAverage.abs());
+
+
+
+
 
     } on SocketException {
       String errMsg = "No Internet connection 😑";
@@ -863,10 +910,10 @@ class DolbyAPIManager{
       logger.i("${response.statusCode} / Get Analyze Json Data");
 
       var decodedResponse = jsonDecode(utf8.decode(response.bodyBytes)) as Map;
-      analyzeNoiseAverage = decodedResponse['processed_region']['audio']['noise']['level_average'];
+      analyzeSNRAverage = decodedResponse['processed_region']['audio']['noise']['snr_average'];
 
-      var cellEnhaceEvaluation = "C${idx+4}";
-      _apiPreferences.excelWriteCell(cellEnhaceEvaluation,analyzeNoiseAverage.abs());
+      var cellSNREvaluation = "C${idx+4}";
+      _apiPreferences.excelWriteCell(cellSNREvaluation,analyzeSNRAverage.abs());
 
     } on SocketException {
       String errMsg = "No Internet connection 😑 / $idx";
@@ -878,11 +925,9 @@ class DolbyAPIManager{
       throw HttpException(errMsg);
     }
 
-    var diffNoise = originalAnalyzeNoiseAverage.abs() - analyzeNoiseAverage.abs();
-    //logger.i("$diffNoise");
-
-    var cellReduce = "D${idx+4}";
-    _apiPreferences.excelWriteCell(cellReduce,diffNoise);
+    var diffSNR = analyzeSNRAverage - originalAnalyzeSNRAverage;
+    var cellSNR = "D${idx+4}";
+    _apiPreferences.excelWriteCell(cellSNR,diffSNR);
 
   }
 
@@ -977,7 +1022,7 @@ class DolbyAPIManager{
           }
         });
 
-        await Future.delayed(const Duration(milliseconds : MEDIA_API_TIMER_PERIODIC_MS));
+        await Future.delayed(const Duration(milliseconds : MEDIA_API_WAIT_DURATION_MS));
       } while (isRun);
 
     //   Timer.periodic(
@@ -1061,42 +1106,42 @@ class DolbyAPIManager{
     return response.body;
   }
 
-  Future<bool> _startStt(int idx) async {
+  Future<bool> _startStt(int idx, bool isOriginal) async {
 
     bool returnValue = false;
 
-    Uri uri = Uri.parse("http://localhost:8080/startStt");
+    Uri uri = Uri.parse("http://${dotenv.env['GoIPAddress']}:8080/startStt");
     Map<String, String> header = {
       'content-type': "application/json",
     };
     Map<String, dynamic> data = {
       "index": idx,
+      "isOriginal" : isOriginal
     };
 
     try {
 
       final response = await post(uri, headers: header ,body:jsonEncode(data));
 
-      if (response.
-      statusCode != 200)throw HttpException('${response.statusCode} / ${response.body}');
+      if (response.statusCode != 200)throw HttpException('${response.statusCode} / ${response.body}');
 
       //logger.i("${response.statusCode} / ${response.body}");
-      logger.i("$idx - Stt Start");
+      logger.i("$idx(isOriginal : $isOriginal) - Stt Start");
 
       bool isRun = true;
       do {
-        await _checkSttStatus(idx).then((val) {
+        await _checkSttStatus(idx, isOriginal).then((val) {
           var decodedUrlJson = jsonDecode(val);
 
           if(decodedUrlJson['result'] == 'COMPLETED'){
-            logger.i("$idx - Stt End");
+            logger.i("$idx(isOriginal : $isOriginal) - Stt End");
 
             isRun = false;
             returnValue = true;
           }
         });
 
-        await Future.delayed(const Duration(milliseconds : MEDIA_API_WAIT_STT_PERIODIC_MS));
+        await Future.delayed(const Duration(milliseconds : MEDIA_API_WAIT_STT_DURATION_MS));
 
       } while (isRun);
 
@@ -1115,9 +1160,128 @@ class DolbyAPIManager{
     return returnValue;
   }
 
-  Future<String> _checkSttStatus(int idx) async {
+  Future<String> _checkSttStatus(int idx, bool isOriginal) async {
 
-    Uri uri = Uri.parse("http://localhost:8080/getStt");
+    Uri uri = Uri.parse("http://${dotenv.env['GoIPAddress']}:8080/getStt");
+    Map<String, String> header = {
+      'content-type': "application/json",
+    };
+    Map<String, dynamic> data = {
+      "index": idx,
+      "isOriginal" : isOriginal
+    };
+
+    late Response response;
+
+    try {
+      response = await post(uri, headers: header, body:jsonEncode(data));
+
+      if (response.statusCode != 200)throw HttpException('${response.statusCode} / ${response.body}');
+
+      //logger.i("${response.statusCode} / ${response.body}");
+
+    } on SocketException {
+      String errMsg = "No Internet connection 😑";
+      logger.e(errMsg);
+      throw SocketException(errMsg);
+    } on HttpException catch (e) {
+      String errMsg = "Couldn't find the post 😱 ${e}";
+      logger.e(errMsg);
+      throw HttpException(errMsg);
+    }
+
+    return response.body;
+  }
+
+  Future<String> _cleanupStt(int count, bool isOriginal) async {
+
+    Uri uri = Uri.parse("http://${dotenv.env['GoIPAddress']}:8080/cleanUpSTT");
+    Map<String, String> header = {
+      'content-type': "application/json",
+    };
+    Map<String, dynamic> data = {
+      "index": count,
+      "isOriginal" : isOriginal
+    };
+
+    late Response response;
+
+    try {
+      response = await post(uri, headers: header, body:jsonEncode(data));
+
+      if (response.statusCode != 200)throw HttpException('${response.statusCode} / ${response.body}');
+
+      //logger.i("${response.statusCode} / ${response.body}");
+
+    } on SocketException {
+      String errMsg = "No Internet connection 😑";
+      logger.e(errMsg);
+      throw SocketException(errMsg);
+    } on HttpException catch (e) {
+      String errMsg = "Couldn't find the post 😱 ${e}";
+      logger.e(errMsg);
+      throw HttpException(errMsg);
+    }
+
+    return response.body;
+  }
+
+  Future<bool> _startVideoStt(int idx) async {
+
+    bool returnValue = false;
+
+    Uri uri = Uri.parse("http://${dotenv.env['GoIPAddress']}:8080/startVideoStt");
+    Map<String, String> header = {
+      'content-type': "application/json",
+    };
+    Map<String, dynamic> data = {
+      "index": idx,
+    };
+
+    try {
+
+      final response = await post(uri, headers: header ,body:jsonEncode(data));
+
+      if (response.statusCode != 200)throw HttpException('${response.statusCode} / ${response.body}');
+
+      //logger.i("${response.statusCode} / ${response.body}");
+      logger.i("$idx - Stt Start");
+
+      bool isRun = true;
+      do {
+        await _checkVideoSttStatus(idx).then((val) {
+          var decodedUrlJson = jsonDecode(val);
+
+          if(decodedUrlJson['result'] == 'COMPLETED'){
+            logger.i("$idx - Stt End");
+
+            isRun = false;
+            returnValue = true;
+          }
+        });
+
+        await Future.delayed(const Duration(milliseconds : MEDIA_API_WAIT_STT_DURATION_MS));
+
+      } while (isRun);
+
+
+      
+    } on SocketException catch (e){
+      String errMsg = "No Internet connection($idx) 😑 : $e";
+      logger.e(errMsg);
+      throw SocketException(errMsg);
+    } on HttpException catch (e) {
+      String errMsg = "Couldn't find the post 😱 $e";
+      logger.e(errMsg);
+      throw HttpException(errMsg);
+    }
+
+    return returnValue;
+  }
+
+  Future<String> _checkVideoSttStatus(int idx) async {
+
+    Uri uri = Uri.parse("http://${dotenv.env['GoIPAddress']}:8080/getVideoStt");
     Map<String, String> header = {
       'content-type': "application/json",
     };
@@ -1147,14 +1311,14 @@ class DolbyAPIManager{
     return response.body;
   }
 
-  Future<String> _cleanupStt(int idx) async {
+  Future<String> _cleanupVideoStt(int count) async {
 
-    Uri uri = Uri.parse("http://localhost:8080/cleanupStt");
+    Uri uri = Uri.parse("http://${dotenv.env['GoIPAddress']}:8080/cleanUpVideoSTT");
     Map<String, String> header = {
       'content-type': "application/json",
     };
     Map<String, dynamic> data = {
-      "index": idx,
+      "index": count,
     };
 
     late Response response;
@@ -1177,6 +1341,73 @@ class DolbyAPIManager{
     }
 
     return response.body;
+  }
+
+  void _uploadExcel(String fileName, List<int>? filedata) async {
+
+    Uri uri = Uri.parse("http://${dotenv.env['GoIPAddress']}:8080/uploadExcel");
+    Map<String, String> header = {
+      'content-type': "application/json",
+    };
+    Map<String, dynamic> data = {
+      "fileName": fileName,
+      "fileData" : filedata
+    };
+
+
+    try {
+      var request = MultipartRequest("POST", uri)
+      ..files.add(MultipartFile.fromBytes("excelfile", filedata!,filename: fileName));
+      
+      var response = await request.send();
+
+      if (response.statusCode != 200)throw HttpException('${response.statusCode}');
+
+      //logger.i("${response.statusCode} / ${response.body}");
+
+    } on SocketException {
+      String errMsg = "No Internet connection 😑";
+      logger.e(errMsg);
+      throw SocketException(errMsg);
+    } on HttpException catch (e) {
+      String errMsg = "Couldn't find the post 😱 ${e}";
+      logger.e(errMsg);
+      throw HttpException(errMsg);
+    }
+  }
+
+  Future<bool> _startPreProcess() async {
+
+    bool returnValue = false;
+
+    Uri uri = Uri.https("api.dolby.com", "/media/usage", {"from":"2023-01-01","to":"2023-08-31"});
+    //print(uri);
+
+    Map<String, String> header = {
+      'authorization': "Bearer ${_apiPreferences.read<String>('access_token')}",
+      'content-type': "application/json",
+    };
+
+    late Response response;
+
+    try {
+      response = await get(uri, headers: header);
+
+      if (response.statusCode != 200)throw HttpException('${response.statusCode} / ${response.body}');
+
+      returnValue = true;
+
+    } on SocketException {
+      String errMsg = "No Internet connection 😑";
+      logger.e(errMsg);
+      throw SocketException(errMsg);
+    } on HttpException catch (e) {
+      String errMsg = "Couldn't find the post 😱 ${e}";
+      logger.e(errMsg);
+      throw HttpException(errMsg);
+    }
+
+    return returnValue;
   }
 
 }

@@ -14,7 +14,7 @@ class TokenCondition extends StatefulWidget {
 
 class _TokenConditionState extends State<TokenCondition> {
 
-  bool check = false;
+  bool check = true;
   IconData stateIcon = Icons.sentiment_very_satisfied;
 
   @override
@@ -37,7 +37,7 @@ class _TokenConditionState extends State<TokenCondition> {
         if(check){
           setState(() {
             stateIcon = Icons.sentiment_very_satisfied;
-            check = false;
+            //check = false;
           });
         } else {
           setState(() {
